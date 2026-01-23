@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 HM Revenue & Customs
+ * Copyright 2026 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.operationalmetrics
+package uk.gov.hmrc.operationalmetrics.module
 
+import play.api.inject.{Binding, Module as AppModule}
 import play.api.{Configuration, Environment}
-import play.api.inject.{Binding, Module => AppModule}
+import uk.gov.hmrc.operationalmetrics.scheduler.Schedulers
 
 import java.time.Clock
 
@@ -28,4 +29,5 @@ class Module extends AppModule:
     configuration: Configuration
   ): Seq[Binding[_]] =
     bind[Clock].toInstance(Clock.systemDefaultZone) :: // inject if current time needs to be controlled in unit tests
+    bind[Schedulers].toSelf.eagerly()               ::
     Nil

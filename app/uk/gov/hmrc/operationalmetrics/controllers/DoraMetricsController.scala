@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 HM Revenue & Customs
+ * Copyright 2026 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,30 @@
 
 package uk.gov.hmrc.operationalmetrics.controllers
 
+import play.api.Logging
+import play.api.libs.json.{Json, Writes}
 import play.api.mvc.{Action, AnyContent, ControllerComponents}
+import uk.gov.hmrc.operationalmetrics.model.ServiceLeadTimes
+import uk.gov.hmrc.operationalmetrics.service.DoraMetricsService
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 
 import javax.inject.{Inject, Singleton}
+import scala.concurrent.ExecutionContext
 
-@Singleton()
-class MicroserviceHelloWorldController @Inject()(
-  cc: ControllerComponents
-) extends BackendController(cc):
+@Singleton
+class DoraMetricsController @Inject()(
+  doraMetricsService: DoraMetricsService
+, cc                : ControllerComponents
+)(using
+  ExecutionContext
+) extends BackendController(cc)
+  with Logging:
 
-  val hello: Action[AnyContent] =
-    Action:
-      implicit request =>
-        Ok("Hello world")
+  given Writes[ServiceLeadTimes] = ServiceLeadTimes.apiWrites
+
+  def serviceLeadTimes(): Action[AnyContent] =
+    Action.async: request =>
+      doraMetricsService
+        .getServiceLeadTimes()
+        .map: results =>
+          Ok(Json.toJson(results))
