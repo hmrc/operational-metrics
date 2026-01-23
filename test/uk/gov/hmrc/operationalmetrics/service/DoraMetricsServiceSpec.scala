@@ -19,7 +19,7 @@ package uk.gov.hmrc.operationalmetrics.service
 import org.mockito.Mockito.*
 import org.scalatestplus.mockito.MockitoSugar
 import org.mockito.ArgumentMatchers.{eq as eqTo, *}
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.hmrc.http.HeaderCarrier
@@ -37,7 +37,10 @@ class DoraMetricsServiceSpec
   extends AnyWordSpec
     with Matchers
     with ScalaFutures
-    with MockitoSugar:
+    with IntegrationPatience:
+
+  given HeaderCarrier = HeaderCarrier()
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   "DoraMetricsService.updateServiceLeadTimes" should:
     "calculate lead times for latest releases and save them to repository" in new DoraMetricsServiceFixture:
@@ -60,9 +63,6 @@ class DoraMetricsServiceSpec
       , mockServiceLeadTimesRepository
       )
 
-    given HeaderCarrier    = HeaderCarrier()
-    given ExecutionContext = scala.concurrent.ExecutionContext.global
-
     private val created : Instant = Instant.parse("2026-01-07T11:51:23.000Z")
     private val deployed: Instant = Instant.parse("2026-01-09T11:51:23.000Z")
 
@@ -82,14 +82,14 @@ class DoraMetricsServiceSpec
     private val deploymentEvent: DeploymentEvent =
       DeploymentEvent(ServiceName("service-1"), Version("1.57.0"), deployed)
 
-    when(mockReleasesConnector.releases()(using any[HeaderCarrier]))
+    when(mockReleasesConnector.releases()(using any))
       .thenReturn(Future.successful(releases))
 
-    when(mockServiceDependenciesConnector.getSlugCreationDate(any[ServiceName], any[Version])(using any[HeaderCarrier]))
+    when(mockServiceDependenciesConnector.getSlugCreationDate(any[ServiceName], any[Version])(using any))
       .thenReturn(Future.successful(slugInfo))
 
-    when(mockReleasesConnector.firstCompletedDeployment(any[ServiceName], any[Version], eqTo(Environment.Production))(using any[HeaderCarrier]))
+    when(mockReleasesConnector.firstCompletedDeployment(any[ServiceName], any[Version], eqTo(Environment.Production))(using any))
       .thenReturn(Future.successful(deploymentEvent))
 
-    when(mockServiceLeadTimesRepository.putAll(any[Seq[ServiceLeadTimes]])(using any[ExecutionContext]))
+    when(mockServiceLeadTimesRepository.putAll(any[Seq[ServiceLeadTimes]])(using any))
         .thenReturn(Future.unit)
