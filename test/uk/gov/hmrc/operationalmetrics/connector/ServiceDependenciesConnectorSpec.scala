@@ -70,10 +70,26 @@ class ServiceDependenciesConnectorSpec
           )
       )
 
-      val response: SlugInfo =
+      val response: Option[SlugInfo] =
         serviceDependenciesConnector
-          .getSlugCreationDate(ServiceName("service-1"), Version("1.57.0"))
+          .getSlugInfo(ServiceName("service-1"), Version("1.57.0"))
           .futureValue
 
       response shouldBe
-        SlugInfo(ServiceName("service-1"), Version("1.57.0"), Instant.parse("2019-01-20T14:09:46Z"))
+        Some(SlugInfo(ServiceName("service-1"), Version("1.57.0"), Instant.parse("2019-01-20T14:09:46Z")))
+
+    "return none when slug creation date for a service is not found" in:
+      stubFor(
+        get(urlEqualTo("/api/sluginfo?name=service-1&version=1.57.0"))
+          .willReturn(
+            aResponse()
+              .withStatus(404)
+          )
+      )
+
+      val response: Option[SlugInfo] =
+        serviceDependenciesConnector
+          .getSlugInfo(ServiceName("service-1"), Version("1.57.0"))
+          .futureValue
+
+      response shouldBe None

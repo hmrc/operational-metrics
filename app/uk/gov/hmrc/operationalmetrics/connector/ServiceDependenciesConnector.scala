@@ -41,13 +41,13 @@ class ServiceDependenciesConnector @Inject() (
   private val url: String =
     servicesConfig.baseUrl("service-dependencies")
   
-  def getSlugCreationDate(
+  def getSlugInfo(
     service: ServiceName
   , version: Version
-  )(using HeaderCarrier): Future[SlugInfo] =
+  )(using HeaderCarrier): Future[Option[SlugInfo]] =
     httpClientV2
       .get(url"$url/api/sluginfo?name=${service.asString}&version=${version.toString}")
-      .execute[SlugInfo]
+      .execute[Option[SlugInfo]]
 
 object ServiceDependenciesConnector:
   case class SlugInfo(

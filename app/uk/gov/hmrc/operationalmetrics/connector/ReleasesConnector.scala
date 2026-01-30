@@ -51,11 +51,10 @@ class ReleasesConnector @Inject() (
     serviceName: ServiceName
   , version    : Version
   , environment: Environment
-  )(using HeaderCarrier): Future[DeploymentEvent] =
+  )(using HeaderCarrier): Future[Option[DeploymentEvent]] =
    httpClientV2
      .get(url"$url/releases-api/firstDeployment?service=${serviceName.asString}&version=${version.toString}&environment=${environment.asString}")
-     .execute[DeploymentEvent]
-
+     .execute[Option[DeploymentEvent]]
 
 object ReleasesConnector:
   case class DeploymentEvent(

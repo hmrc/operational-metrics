@@ -28,7 +28,7 @@
 
     <logger name="application" level="DEBUG"/>
 
-    <logger name="connector" level="TRACE" additivity="false">
+    <logger name="connector" level="TRACE">
         <appender-ref ref="STDOUT"/>
     </logger>
 

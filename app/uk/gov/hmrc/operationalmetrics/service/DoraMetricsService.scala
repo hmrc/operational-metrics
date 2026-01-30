@@ -45,35 +45,32 @@ class DoraMetricsService @Inject() (
       releases          <- releasesConnector.releases()
       prodReleases      =  releases.flatMap: wrw =>
                              wrw.versions.collectFirst:
+                              // lead times are currently scoped to Production only
                               case v if v.environment == Environment.Production =>
                                 wrw.serviceName -> v.version
-      slugCreationDates <- prodReleases.foldLeftM(Map.empty[ServiceName, SlugInfo]):
+      slugCreationDates <- prodReleases.foldLeftM(Map.empty[ServiceName, Option[SlugInfo]]):
                              case (acc, (service, version)) =>
                                serviceDependenciesConnector
-                                 .getSlugCreationDate(service, version)
-                                 .map: slugInfo =>
-                                   acc + (service -> slugInfo)
-      prodDeployments   <- prodReleases.foldLeftM(Map.empty[ServiceName, DeploymentEvent]):
+                                 .getSlugInfo(service, version)
+                                 .map(slugInfo => acc + (service -> slugInfo))
+      prodDeployments   <- prodReleases.foldLeftM(Map.empty[ServiceName, Option[DeploymentEvent]]):
                              case (acc, (service, version)) =>
                                releasesConnector
                                  .firstCompletedDeployment(service, version, Environment.Production)
-                                 .map: event =>
-                                   acc + (service -> event)
+                                 .map(event => acc + (service -> event))
       leadTimes         =  prodReleases.map: (service, version) =>
-                             val slugCreationDate    = slugCreationDates(service).created
-                             val firstDeploymentDate = prodDeployments(service).time
-                             val days                = Duration.between(slugCreationDate, firstDeploymentDate).toHours.toInt / 24
                              ServiceLeadTimes(
                                serviceName = service
-                             , leadTimes   = Seq(
-                                               LeadTimeMeasurement(
-                                                 environment     = Environment.Production
-                                               , version         = version
-                                               , slugCreatedAt   = slugCreationDate
-                                               , firstDeployedAt = firstDeploymentDate
-                                               , days            = days
-                                               )
-                                             )
+                             , leadTimes   = slugCreationDates(service).zip(prodDeployments(service))
+                                               .map: (slugInfo, event) =>
+                                                 LeadTimeMeasurement(
+                                                   environment     = Environment.Production
+                                                 , version         = version
+                                                 , slugCreatedAt   = slugInfo.created
+                                                 , firstDeployedAt = event.time
+                                                 , days            = Duration.between(slugInfo.created, event.time).toHours.toInt / 24
+                                                 )
+                                               .toSeq
                              )
-      _                 <- serviceLeadTimesRepository.putAll(leadTimes)                            
+      _                 <- serviceLeadTimesRepository.putAll(leadTimes)
     yield ()

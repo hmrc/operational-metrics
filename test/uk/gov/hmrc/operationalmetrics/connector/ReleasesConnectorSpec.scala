@@ -124,10 +124,26 @@ class ReleasesConnectorSpec
           )
       )
 
-      val response: DeploymentEvent =
+      val response: Option[DeploymentEvent] =
         releasesConnector
           .firstCompletedDeployment(ServiceName("service-1"), Version("1.57.0"), Environment.Production)
           .futureValue
 
       response shouldBe
-        DeploymentEvent(ServiceName("service-1"), Version("1.57.0"), Instant.parse("2019-04-20T14:09:46Z"))
+        Some(DeploymentEvent(ServiceName("service-1"), Version("1.57.0"), Instant.parse("2019-04-20T14:09:46Z")))
+
+    "return none when deployment event for the given service, version and environment is not found" in:
+      stubFor(
+        get(urlEqualTo("/releases-api/firstDeployment?service=service-1&version=1.57.0&environment=production"))
+          .willReturn(
+            aResponse()
+              .withStatus(404)
+          )
+        )
+
+      val response: Option[DeploymentEvent] =
+        releasesConnector
+          .firstCompletedDeployment(ServiceName("service-1"), Version("1.57.0"), Environment.Production)
+          .futureValue
+
+      response shouldBe None

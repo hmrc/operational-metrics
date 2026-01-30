@@ -47,7 +47,7 @@ class DoraMetricsServiceSpec
       service.updateServiceLeadTimes().futureValue
 
       verify(mockReleasesConnector           , times(1)).releases()
-      verify(mockServiceDependenciesConnector, times(1)).getSlugCreationDate(ServiceName("service-1"), Version("1.57.0"))
+      verify(mockServiceDependenciesConnector, times(1)).getSlugInfo(ServiceName("service-1"), Version("1.57.0"))
       verify(mockReleasesConnector           , times(1)).firstCompletedDeployment(ServiceName("service-1"), Version("1.57.0"), Environment.Production)
       verify(mockServiceLeadTimesRepository  , times(1)).putAll(Seq(leadTimes))
 
@@ -85,11 +85,11 @@ class DoraMetricsServiceSpec
     when(mockReleasesConnector.releases()(using any))
       .thenReturn(Future.successful(releases))
 
-    when(mockServiceDependenciesConnector.getSlugCreationDate(any[ServiceName], any[Version])(using any))
-      .thenReturn(Future.successful(slugInfo))
+    when(mockServiceDependenciesConnector.getSlugInfo(any[ServiceName], any[Version])(using any))
+      .thenReturn(Future.successful(Some(slugInfo)))
 
     when(mockReleasesConnector.firstCompletedDeployment(any[ServiceName], any[Version], eqTo(Environment.Production))(using any))
-      .thenReturn(Future.successful(deploymentEvent))
+      .thenReturn(Future.successful(Some(deploymentEvent)))
 
     when(mockServiceLeadTimesRepository.putAll(any[Seq[ServiceLeadTimes]])(using any))
         .thenReturn(Future.unit)
