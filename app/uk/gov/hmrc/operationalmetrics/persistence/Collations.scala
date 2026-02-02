@@ -14,12 +14,17 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.operationalmetrics.config
+package uk.gov.hmrc.operationalmetrics.persistence
 
-import javax.inject.{Inject, Singleton}
-import play.api.Configuration
+import org.mongodb.scala.model.{Collation, CollationStrength}
 
-@Singleton
-class AppConfig @Inject()(config: Configuration):
+object Collations:
 
-  val appName: String = config.get[String]("appName")
+  val caseInsensitive: Collation =
+    Collation.builder()
+      .locale("en")
+      .collationStrength(CollationStrength.SECONDARY)
+      .build()
+
+  val default: Collation =
+    Collation.builder().build()
