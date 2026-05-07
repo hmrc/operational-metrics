@@ -24,7 +24,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.operationalmetrics.connector.{ReleasesConnector, ServiceDependenciesConnector}
-import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.{DeploymentEvent, WhatsRunningWhereVersion}
+import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.{HistoricDeployment, WhatsRunningWhereVersion}
 import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.WhatsRunningWhere.WhatsRunningWhere
 import uk.gov.hmrc.operationalmetrics.connector.ServiceDependenciesConnector.SlugInfo
 import uk.gov.hmrc.operationalmetrics.model.{Environment, LeadTimeMeasurement, ServiceLeadTimes, ServiceName, Version}
@@ -79,8 +79,8 @@ class DoraMetricsServiceSpec
     private val slugInfo: SlugInfo =
       SlugInfo(ServiceName("service-1"), Version("1.57.0"), created)
 
-    private val deploymentEvent: DeploymentEvent =
-      DeploymentEvent(ServiceName("service-1"), Version("1.57.0"), deployed)
+    private val deploymentEvent: HistoricDeployment =
+      HistoricDeployment(ServiceName("service-1"), Version("1.57.0"), deployed)
 
     when(mockReleasesConnector.releases()(using any))
       .thenReturn(Future.successful(releases))

@@ -21,7 +21,7 @@ import play.api.libs.json.*
 import uk.gov.hmrc.http.HttpReads
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.{HeaderCarrier, StringContextOps}
-import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.DeploymentEvent
+import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.HistoricDeployment
 import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.WhatsRunningWhere.WhatsRunningWhere
 import uk.gov.hmrc.operationalmetrics.model.{Environment, ServiceName, Version}
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
@@ -37,7 +37,7 @@ class ReleasesConnector @Inject() (
 )(using 
   ec: ExecutionContext
 ):
-  import HttpReads.Implicits._
+  import HttpReads.Implicits.*
 
   private val url: String =
     servicesConfig.baseUrl("releases-api")
@@ -51,24 +51,33 @@ class ReleasesConnector @Inject() (
     serviceName: ServiceName
   , version    : Version
   , environment: Environment
-  )(using HeaderCarrier): Future[Option[DeploymentEvent]] =
+  )(using HeaderCarrier): Future[Option[HistoricDeployment]] =
    httpClientV2
      .get(url"$url/releases-api/firstDeployment?service=${serviceName.asString}&version=${version.toString}&environment=${environment.asString}")
-     .execute[Option[DeploymentEvent]]
+     .execute[Option[HistoricDeployment]]
+
+  def previousDeployment(
+    serviceName: ServiceName
+  , environment: Environment
+  , dateTime   : Instant
+  )(using HeaderCarrier): Future[Option[HistoricDeployment]] =
+    httpClientV2
+      .get(url"$url/releases-api/previousDeployment?service=${serviceName.asString}&environment=${environment.asString}&time=$dateTime")
+      .execute[Option[HistoricDeployment]]
 
 object ReleasesConnector:
-  case class DeploymentEvent(
+  case class HistoricDeployment(
     serviceName: ServiceName
   , version    : Version
   , time       : Instant
   )
   
-  object DeploymentEvent:
-    given deploymentEventReads: Reads[DeploymentEvent] =
+  object HistoricDeployment:
+    given deploymentReads: Reads[HistoricDeployment] =
       ( (__ \ "serviceName").read[ServiceName]
       ~ (__ \ "version"    ).read[Version]
       ~ (__ \ "time"       ).read[Instant]
-      )((service, version, time) => DeploymentEvent(service, version, time))
+      )(HistoricDeployment.apply)
 
     def format[A, B](f: A => B, g: B => A)(using fa: Format[A]): Format[B] =
       fa.inmap(f, g)
@@ -82,7 +91,7 @@ object ReleasesConnector:
     given whatsRunningWhereVersionReads: Reads[WhatsRunningWhereVersion] =
       ( (__ \ "environment"  ).read[Environment]
       ~ (__ \ "versionNumber").read[Version]
-      )((env, version) => WhatsRunningWhereVersion(env, version))
+      )(WhatsRunningWhereVersion.apply)
   
   object WhatsRunningWhere:
     case class WhatsRunningWhere(
@@ -94,3 +103,4 @@ object ReleasesConnector:
       ( (__ \ "applicationName").read[ServiceName]
       ~ (__ \ "versions"       ).read[List[WhatsRunningWhereVersion]]
       )(WhatsRunningWhere.apply)
+end ReleasesConnector

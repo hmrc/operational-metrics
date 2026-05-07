@@ -61,4 +61,4 @@ object ServiceDependenciesConnector:
       ( (__ \ "name"   ).read[ServiceName]
       ~ (__ \ "version").read[Version]
       ~ (__ \ "created").read[Instant]
-      )((name, version, created) => SlugInfo(name, version, created))
+      )(SlugInfo.apply)

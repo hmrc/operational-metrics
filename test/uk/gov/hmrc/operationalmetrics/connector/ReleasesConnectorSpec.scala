@@ -26,7 +26,7 @@ import play.api.Configuration
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
 import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.WhatsRunningWhere.WhatsRunningWhere
-import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.{DeploymentEvent, WhatsRunningWhereVersion}
+import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.{HistoricDeployment, WhatsRunningWhereVersion}
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 import uk.gov.hmrc.operationalmetrics.model.{Environment, ServiceName, Version}
 
@@ -124,13 +124,13 @@ class ReleasesConnectorSpec
           )
       )
 
-      val response: Option[DeploymentEvent] =
+      val response: Option[HistoricDeployment] =
         releasesConnector
           .firstCompletedDeployment(ServiceName("service-1"), Version("1.57.0"), Environment.Production)
           .futureValue
 
       response shouldBe
-        Some(DeploymentEvent(ServiceName("service-1"), Version("1.57.0"), Instant.parse("2019-04-20T14:09:46Z")))
+        Some(HistoricDeployment(ServiceName("service-1"), Version("1.57.0"), Instant.parse("2019-04-20T14:09:46Z")))
 
     "return none when deployment event for the given service, version and environment is not found" in:
       stubFor(
@@ -141,9 +141,52 @@ class ReleasesConnectorSpec
           )
         )
 
-      val response: Option[DeploymentEvent] =
+      val response: Option[HistoricDeployment] =
         releasesConnector
           .firstCompletedDeployment(ServiceName("service-1"), Version("1.57.0"), Environment.Production)
+          .futureValue
+
+      response shouldBe None
+
+  "GET previousDeployment" should:
+    "return the previous deployment based on deployment timestamp for given a service and environment" in:
+      stubFor(
+        get(urlEqualTo("/releases-api/previousDeployment?service=service-1&environment=production&time=2026-04-29T14:19:00.337Z"))
+          .willReturn(
+            aResponse()
+              .withStatus(200)
+              .withBody(
+                """
+                  {
+                    "serviceName": "service-1",
+                    "version": "1.57.0",
+                    "time" : "2026-04-25T11:19:00.337Z"
+                  }
+                """
+              )
+          )
+      )
+
+      val response: Option[HistoricDeployment] =
+        releasesConnector
+          .previousDeployment(ServiceName("service-1"), Environment.Production, Instant.parse("2026-04-29T14:19:00.337Z"))
+          .futureValue
+
+      response shouldBe
+        Some(HistoricDeployment(ServiceName("service-1"), Version("1.57.0"), Instant.parse("2026-04-25T11:19:00.337Z")))
+    
+    "return none when previous deployment based on the deployment timestamp for the given service and environment is not found" in:
+      stubFor(
+        get(urlEqualTo("/releases-api/previousDeployment?service=service-1&environment=production&time=2026-04-29T14:19:00.337Z"))
+          .willReturn(
+            aResponse()
+              .withStatus(404)
+          )
+        )
+
+      val response: Option[HistoricDeployment] =
+        releasesConnector
+          .previousDeployment(ServiceName("service-1"), Environment.Production, Instant.parse("2026-04-29T14:19:00.337Z"))
           .futureValue
 
       response shouldBe None
