@@ -44,20 +44,21 @@ class DeploymentEventHandler @Inject()(
     message: Message
   , payload: DeploymentEvent
   ): String =
-    s"Deployment Event message with ID '${message.messageId()}' event type: ${payload.eventType.value} " +
-    s"and details: ${payload.serviceName.asString} ${payload.version.original} ${payload.environment.asString}"
+    s"Deployment Event message with ID: ${message.messageId()} event type: ${payload.eventType.value} " +
+    s"and details: ${payload.serviceName.asString} ${payload.version.original} ${payload.environment.asString}."
 
   override private[notification] def processMessage(message: Message): Future[MessageAction] =
-    logger.info(s"Starting processing Deployment Event message from  with ID '${message.messageId()}'")
+    logger.info(s"Starting processing Deployment Event message with ID: ${message.messageId()}")
     (for
       payload <- EitherT.fromEither[Future]:
                    Json
                      .parse(message.body)
                      .validate(RawDeploymentEventParser.deploymentEventReads)
                      .asEither
+                     .map(_.copy(messageId = message.messageId()))
                      .left
                      .map: error =>
-                       s"Could not parse Deployment Event message with ID '${message.messageId()}' and body: ${message.body}. Reason: $error"
+                       s"Could not parse Deployment Event message with ID ${message.messageId()} and body: ${message.body}. Reason: $error"
       _       <- payload.eventType match
                    case ECSEventType.DeploymentComplete
                       | ECSEventType.UnDeploymentFailed
@@ -65,9 +66,9 @@ class DeploymentEventHandler @Inject()(
                                                                repository
                                                                  .pushNew(payload) // insert into work item repo
                                                                  .map: _ =>
-                                                                   logger.info(s"${prefixLog(message, payload)} successfully pushed to work item repo.")
+                                                                   logger.info(s"Successfully pushed to work item repo: ${prefixLog(message, payload)}")
                    case _                                 => EitherT.right[String](Future.unit)
-      _       =  logger.info(s"${prefixLog(message, payload)} successfully processed.")
+      _       =  logger.info(s"Successfully processed: ${prefixLog(message, payload)}")
     yield
       MessageAction.Delete(message)
     ).value.map:

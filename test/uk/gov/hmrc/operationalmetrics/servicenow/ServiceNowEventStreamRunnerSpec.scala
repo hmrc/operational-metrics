@@ -323,6 +323,7 @@ class ServiceNowEventStreamRunnerSpec
       , userName     = Some(UserName("user-1"))
       , slugUri      = "uri"
       , config       = Seq(deploymentConfigFile1, deploymentConfigFile2)
+      , messageId    = "message1"
       )
 
     val workItem: WorkItem[DeploymentEvent] =

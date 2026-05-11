@@ -106,9 +106,7 @@ class ServiceNowEventStreamRunner @Inject()(
                            .flatTap:
                              case None    => Future.successful(logger.warn(s"Missing meta artefact for ${event.serviceName.asString} ${event.version.original}, deriving branch from version"))
                              case Some(_) => Future.unit
-      branch          =  metaArtefact
-                           .flatMap(_.gitBranch)
-                           .getOrElse(if event.version.isHotfix then "hotfix" else "main")
+      branch          =  metaArtefact.flatMap(_.gitBranch).getOrElse(if event.version.isHotfix then "hotfix" else "main")
       commitIds       =  metaArtefact.flatMap(_.gitCommit).toSeq ++ event.config.map(_.commitId)
       serviceNowEvent =  ServiceNowEvent(
                            requestedBy          = event.userName.getOrElse(UserName("default"))
@@ -127,13 +125,17 @@ class ServiceNowEventStreamRunner @Inject()(
                          , configurationItem    = event.serviceName
                          )
       _               <- serviceNowConnector.sendToServiceNow(serviceNowEvent)
+      _               =  logger.info(
+                           s"Successfully sent event to ServiceNow with ID: ${event.messageId} event type: ${event.eventType.value} "
+                         + s"and details: ${event.serviceName.asString} ${event.version.original} in ${event.environment.asString}"
+                         )
     yield ()
-  
+
   private def processingStatusFailedLog(wi: WorkItem[DeploymentEvent]): String =
-    s"Failed to send ServiceNow event, will retry in ${config.getMillis("queue.retryInterval") / 1000}s - " +
+    s"Failed to send ServiceNow event with ID: ${wi.item.messageId}, will retry in ${config.getMillis("queue.retryInterval") / 1000}s - " +
     s"Deployment Event: ${wi.item.eventType.value} for ${wi.item.serviceName.asString} ${wi.item.version.original} in ${wi.item.environment.asString}, attempt: ${wi.failureCount}"
   
   private def processingStatusPermanentlyFailedLog(wi: WorkItem[DeploymentEvent]): String =
-    s"Failed to send ServiceNow event after ${wi.failureCount} attempts, marking as permanently failed - " +
+    s"Failed to send ServiceNow event with ID: ${wi.item.messageId} after ${wi.failureCount} attempts, marking as permanently failed - " +
     s"Deployment Event: ${wi.item.eventType.value} for ${wi.item.serviceName.asString} ${wi.item.version.original} in ${wi.item.environment.asString}"
 end ServiceNowEventStreamRunner

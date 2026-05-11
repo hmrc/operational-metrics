@@ -46,6 +46,7 @@ case class DeploymentEvent(
 , userName    : Option[UserName]
 , config      : Seq[DeploymentConfigFile]
 , slugUri     : String
+, messageId   : String
 )
 
 object DeploymentEvent:
@@ -61,4 +62,5 @@ object DeploymentEvent:
     ~ (__ \ "deployer_principal"  ).formatNullable[UserName]
     ~ (__ \ "config"              ).format[Seq[DeploymentConfigFile]]
     ~ (__ \ "slug_uri"            ).format[String]
+    ~ (__ \ "messageId"           ).format[String]
     )(DeploymentEvent.apply, pt => Tuple.fromProductTyped(pt))

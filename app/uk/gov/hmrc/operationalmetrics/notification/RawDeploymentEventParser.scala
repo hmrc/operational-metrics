@@ -73,4 +73,5 @@ object RawDeploymentEventParser extends DefaultJsonFormats:
     ~ (__ \ "deployer_principal"                ).read[UserName].map(Some.apply)
     ~ Reads.pure(Seq.empty[DeploymentConfigFile]) // config - to be added
     ~ (__ \ "slug_uri"                          ).read[String]
+    ~ Reads.pure("")                             // messageId - to be added
     )(DeploymentEvent.apply _)

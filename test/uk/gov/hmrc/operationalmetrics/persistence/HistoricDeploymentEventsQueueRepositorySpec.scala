@@ -55,6 +55,7 @@ class HistoricDeploymentEventsQueueRepositorySpec
     , time         = anInstant
     , userName     = None
     , slugUri      = "uri"
+    , messageId    = "message1"
     , config       = DeploymentConfigFile(
                        repoName = RepoName("service-1")
                      , fileName = FileName("service-1")

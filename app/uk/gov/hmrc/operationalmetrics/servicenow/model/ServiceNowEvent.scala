@@ -25,6 +25,7 @@ import java.time.Instant
 
 case class ServiceNowEvent(
   requestedBy         : UserName
+, assignmentGroup     : String = "DevOps"
 , shortDescription    : String
 , pipelineExecutionId : String
 , repository          : String
@@ -44,6 +45,7 @@ object ServiceNowEvent:
   given writes: Writes[ServiceNowEvent] =
     given Writes[ECSEventType] = Writes { event => JsString(event.value) }
     ( (__ \ "requestedBy"         ).write[UserName]
+    ~ (__ \ "assignmentGroup"     ).write[String]
     ~ (__ \ "shortDescription"    ).write[String]
     ~ (__ \ "pipelineExecutionId" ).write[String]
     ~ (__ \ "repository"          ).write[String]

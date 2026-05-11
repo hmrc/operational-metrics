@@ -60,6 +60,7 @@ class RawDeploymentEventParserSpec extends AnyWordSpec with Matchers:
     , time         = Instant.parse("2020-05-21T12:36:23.953Z")
     , userName     = Some(UserName("jenkins-orchestrator"))
     , slugUri      = "https://webstore.tax.service.gov.uk/slugs/common-transit-convention-traders/common-transit-convention-traders_0.82.0_0.5.2.tgz"
+    , messageId    = "" // message id not added yet
     , config       = DeploymentConfigFile(
                        repoName = RepoName("app-config-common")
                      , fileName = FileName("development-microservice-common.yaml")
