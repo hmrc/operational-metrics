@@ -21,7 +21,7 @@ import org.apache.pekko.actor.ActorSystem
 import play.api.Configuration
 import play.api.libs.json.Json
 import software.amazon.awssdk.services.sqs.model.Message
-import uk.gov.hmrc.operationalmetrics.model.DeploymentEvent
+import uk.gov.hmrc.operationalmetrics.model.{DeploymentEvent, UserName}
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
 import uk.gov.hmrc.operationalmetrics.persistence.DeploymentEventsQueueRepository
 
@@ -56,6 +56,10 @@ class DeploymentEventHandler @Inject()(
                      .validate(RawDeploymentEventParser.deploymentEventReads)
                      .asEither
                      .map(_.copy(messageId = message.messageId()))
+                     .map: event =>
+                             if   event.userName == UserName.unknown
+                             then logger.warn(s"Unknown deployer_principal for message ID: ${message.messageId()}") // how many of these events do we receive
+                                  event
                      .left
                      .map: error =>
                        s"Could not parse Deployment Event message with ID ${message.messageId()} and body: ${message.body}. Reason: $error"

@@ -22,7 +22,7 @@ import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import play.api.{Configuration, Logging}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.mongo.workitem.{ProcessingStatus, WorkItem}
-import uk.gov.hmrc.operationalmetrics.model.{DeploymentEvent, UserName, Version}
+import uk.gov.hmrc.operationalmetrics.model.{DeploymentEvent, Version}
 import uk.gov.hmrc.operationalmetrics.persistence.DeploymentEventsQueueRepository
 import uk.gov.hmrc.operationalmetrics.connector.{ArtefactProcessorConnector, ReleasesConnector}
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
@@ -109,7 +109,7 @@ class ServiceNowEventStreamRunner @Inject()(
       branch          =  metaArtefact.flatMap(_.gitBranch).getOrElse(if event.version.isHotfix then "hotfix" else "main")
       commitIds       =  metaArtefact.flatMap(_.gitCommit).toSeq ++ event.config.map(_.commitId)
       serviceNowEvent =  ServiceNowEvent(
-                           requestedBy          = event.userName.getOrElse(UserName("default"))
+                           requestedBy          = event.userName
                          , shortDescription     = deploymentDescription(event, previous.map(_.version))
                          , pipelineExecutionId  = event.deploymentId
                          , repository           = s"https://github.com/hmrc/${event.serviceName.asString}"
@@ -117,7 +117,7 @@ class ServiceNowEventStreamRunner @Inject()(
                          , commitIds            = commitIds
                          , artefact             = event.slugUri
                          , testResults          = "Pass"
-                         , startDateTime        = None
+                         , startDateTime        = event.time
                          , endDateTime          = event.time
                          , deploymentStatus     = event.eventType
                          , implementationResult = event.eventType

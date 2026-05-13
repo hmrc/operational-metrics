@@ -320,7 +320,7 @@ class ServiceNowEventStreamRunnerSpec
       , eventType    = ECSEventType.DeploymentComplete
       , version      = Version(2, 0, 0, "2.0.0")
       , time         = java.time.Instant.now()
-      , userName     = Some(UserName("user-1"))
+      , userName     = UserName("user-1")
       , slugUri      = "uri"
       , config       = Seq(deploymentConfigFile1, deploymentConfigFile2)
       , messageId    = "message1"
@@ -364,7 +364,7 @@ class ServiceNowEventStreamRunnerSpec
       , commitIds            = Seq(CommitId("repo-commit-id"), CommitId("config-commit-id-1"), CommitId("config-commit-id-2"))
       , artefact             = "uri"
       , testResults          = "Pass"
-      , startDateTime        = None
+      , startDateTime        = workItem.item.time
       , endDateTime          = workItem.item.time
       , deploymentStatus     = ECSEventType.DeploymentComplete
       , implementationResult = ECSEventType.DeploymentComplete

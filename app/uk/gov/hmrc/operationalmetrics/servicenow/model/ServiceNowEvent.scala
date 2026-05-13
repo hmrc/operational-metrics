@@ -33,7 +33,7 @@ case class ServiceNowEvent(
 , commitIds           : Seq[CommitId]
 , artefact            : String
 , testResults         : String = "Pass"
-, startDateTime       : Option[Instant] = None
+, startDateTime       : Instant
 , endDateTime         : Instant
 , deploymentStatus    : ECSEventType
 , implementationResult: ECSEventType
@@ -53,7 +53,7 @@ object ServiceNowEvent:
     ~ (__ \ "commitIds"           ).write[Seq[CommitId]]
     ~ (__ \ "artefact"            ).write[String]
     ~ (__ \ "testResults"         ).write[String]
-    ~ (__ \ "startDateTime"       ).writeNullable[Instant]
+    ~ (__ \ "startDateTime"       ).write[Instant]
     ~ (__ \ "endDateTime"         ).write[Instant]
     ~ (__ \ "deploymentStatus"    ).write[ECSEventType]
     ~ (__ \ "implementationResult").write[ECSEventType]

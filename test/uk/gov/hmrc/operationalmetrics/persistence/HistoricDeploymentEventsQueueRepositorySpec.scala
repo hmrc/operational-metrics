@@ -25,7 +25,7 @@ import play.api.{Configuration, Environment as PlayEnvironment}
 import uk.gov.hmrc.mongo.test.DefaultPlayMongoRepositorySupport
 import uk.gov.hmrc.mongo.workitem.{ProcessingStatus, WorkItem}
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
-import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentConfigFile, DeploymentEvent, Environment, FileName, RepoName, ServiceName, Version}
+import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentConfigFile, DeploymentEvent, Environment, FileName, RepoName, ServiceName, UserName, Version}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -53,7 +53,7 @@ class HistoricDeploymentEventsQueueRepositorySpec
     , eventType    = ECSEventType.DeploymentComplete
     , version      = Version(1, 0, 0, "1.0.0")
     , time         = anInstant
-    , userName     = None
+    , userName     = UserName("user-1")
     , slugUri      = "uri"
     , messageId    = "message1"
     , config       = DeploymentConfigFile(

@@ -41,8 +41,11 @@ object CommitId:
 
 case class UserName(asString: String) extends AnyVal
 object UserName:
+  val unknown: UserName  = 
+    UserName("unknown")
+
   given Format[UserName] =
-    Format.of[String].inmap(UserName.apply, _.asString)
+    Format.of[String].inmap(UserName.apply, _.asString)    
 
 case class Version(
   major   : Int

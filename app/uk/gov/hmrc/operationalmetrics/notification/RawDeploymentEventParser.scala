@@ -70,7 +70,7 @@ object RawDeploymentEventParser extends DefaultJsonFormats:
     ~ (__ \ "event_type"                        ).read[ECSEventType]
     ~ (__ \ "microservice_version"              ).read[Version]
     ~ (__ \ "event_date_time"                   ).read[Instant]
-    ~ (__ \ "deployer_principal"                ).read[UserName].map(Some.apply)
+    ~ (__ \ "deployer_principal"                ).readNullable[UserName].map(_.getOrElse(UserName.unknown))
     ~ Reads.pure(Seq.empty[DeploymentConfigFile]) // config - to be added
     ~ (__ \ "slug_uri"                          ).read[String]
     ~ Reads.pure("")                             // messageId - to be added

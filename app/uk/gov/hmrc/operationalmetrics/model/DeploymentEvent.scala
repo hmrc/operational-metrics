@@ -43,7 +43,7 @@ case class DeploymentEvent(
 , eventType   : ECSEventType
 , version     : Version
 , time        : Instant
-, userName    : Option[UserName]
+, userName    : UserName
 , config      : Seq[DeploymentConfigFile]
 , slugUri     : String
 , messageId   : String
@@ -59,7 +59,7 @@ object DeploymentEvent:
     ~ (__ \ "event_type"          ).format[ECSEventType]
     ~ (__ \ "microservice_version").format[Version]
     ~ (__ \ "event_date_time"     ).format[Instant]
-    ~ (__ \ "deployer_principal"  ).formatNullable[UserName]
+    ~ (__ \ "deployer_principal"  ).format[UserName]
     ~ (__ \ "config"              ).format[Seq[DeploymentConfigFile]]
     ~ (__ \ "slug_uri"            ).format[String]
     ~ (__ \ "messageId"           ).format[String]

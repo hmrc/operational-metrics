@@ -58,7 +58,7 @@ class ServiceNowConnectorSpec
     , commitIds            = Seq(CommitId("abc123"))
     , artefact             = "uri"
     , testResults          = "Pass"
-    , startDateTime        = None
+    , startDateTime        = Instant.parse("2020-05-21T12:36:23.953Z")
     , endDateTime          = Instant.parse("2020-05-21T12:36:23.953Z")
     , deploymentStatus     = ECSEventType.DeploymentComplete
     , implementationResult = ECSEventType.DeploymentComplete
