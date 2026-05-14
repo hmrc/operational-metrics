@@ -17,17 +17,30 @@
 package uk.gov.hmrc.operationalmetrics.module
 
 import play.api.inject.{Binding, Module as AppModule}
-import play.api.{Configuration, Environment}
+import play.api.{Configuration, Environment, Logging}
+import uk.gov.hmrc.operationalmetrics.notification.DeploymentEventHandler
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowEventStreamRunner
 import uk.gov.hmrc.operationalmetrics.scheduler.Schedulers
 
 import java.time.Clock
 
-class Module extends AppModule:
+class Module extends AppModule with Logging:
+  
+  /** Bindings are enabled via the `sqs.enabled` config setting */
+  private def ecsDeploymentsBindings(configuration: Configuration): Seq[Binding[_]] =
+    if configuration.get[Boolean]("aws.sqs.enabled") then
+      bind[DeploymentEventHandler].toSelf.eagerly() ::
+      Nil
+    else
+      logger.warn("DeploymentHandler is disabled")
+      Seq.empty
 
   override def bindings(
-    environment  : Environment,
-    configuration: Configuration
+   environment  : Environment, 
+   configuration: Configuration
   ): Seq[Binding[_]] =
-    bind[Clock].toInstance(Clock.systemDefaultZone) :: // inject if current time needs to be controlled in unit tests
-    bind[Schedulers].toSelf.eagerly()               ::
-    Nil
+    Seq(
+      bind[Schedulers].toSelf.eagerly()
+    , bind[Clock     ].toInstance(Clock.systemDefaultZone)
+    , bind[ServiceNowEventStreamRunner].toSelf.eagerly()
+    ) ++ ecsDeploymentsBindings(configuration)

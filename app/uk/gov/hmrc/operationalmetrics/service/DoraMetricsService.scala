@@ -19,7 +19,7 @@ package uk.gov.hmrc.operationalmetrics.service
 import cats.implicits.*
 import uk.gov.hmrc.operationalmetrics.connector.{ReleasesConnector, ServiceDependenciesConnector}
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.DeploymentEvent
+import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.HistoricDeployment
 import uk.gov.hmrc.operationalmetrics.connector.ServiceDependenciesConnector.SlugInfo
 import uk.gov.hmrc.operationalmetrics.model.{Environment, LeadTimeMeasurement, ServiceLeadTimes, ServiceName, Version}
 import uk.gov.hmrc.operationalmetrics.persistence.ServiceLeadTimesRepository
@@ -53,7 +53,7 @@ class DoraMetricsService @Inject() (
                                serviceDependenciesConnector
                                  .getSlugInfo(service, version)
                                  .map(slugInfo => acc + (service -> slugInfo))
-      prodDeployments   <- prodReleases.foldLeftM(Map.empty[ServiceName, Option[DeploymentEvent]]):
+      prodDeployments   <- prodReleases.foldLeftM(Map.empty[ServiceName, Option[HistoricDeployment]]):
                              case (acc, (service, version)) =>
                                releasesConnector
                                  .firstCompletedDeployment(service, version, Environment.Production)

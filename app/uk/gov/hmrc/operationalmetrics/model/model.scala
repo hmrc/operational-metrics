@@ -20,10 +20,32 @@ import play.api.libs.json.*
 import play.api.libs.functional.syntax.*
 
 case class ServiceName(asString: String) extends AnyVal
-
 object ServiceName:
   given Format[ServiceName] =
     Format.of[String].inmap(ServiceName.apply, _.asString)
+
+case class RepoName(asString: String) extends AnyVal
+object RepoName:
+  given Format[RepoName] =
+    Format.of[String].inmap(RepoName.apply, _.asString)
+
+case class FileName(asString: String) extends AnyVal
+object FileName:
+  given Format[FileName] =
+    Format.of[String].inmap(FileName.apply, _.asString)
+
+case class CommitId(asString: String) extends AnyVal
+object CommitId:
+  given Format[CommitId] =
+    Format.of[String].inmap(CommitId.apply, _.asString)
+
+case class UserName(asString: String) extends AnyVal
+object UserName:
+  val unknown: UserName  = 
+    UserName("unknown")
+
+  given Format[UserName] =
+    Format.of[String].inmap(UserName.apply, _.asString)    
 
 case class Version(
   major   : Int
@@ -32,6 +54,9 @@ case class Version(
 , original: String
 ):
   override def toString: String = original
+  
+  def isHotfix: Boolean =
+    patch != 0
 
 object Version:
   given Format[Version] =
