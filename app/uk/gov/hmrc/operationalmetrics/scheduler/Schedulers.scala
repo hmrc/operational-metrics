@@ -17,6 +17,7 @@
 package uk.gov.hmrc.operationalmetrics.scheduler
 
 import org.apache.pekko.actor.ActorSystem
+
 import javax.inject.{Inject, Singleton}
 import play.api.{Configuration, Logging}
 import play.api.inject.ApplicationLifecycle
@@ -24,12 +25,14 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.mongo.TimestampSupport
 import uk.gov.hmrc.mongo.lock.{MongoLockRepository, ScheduledLockService}
 import uk.gov.hmrc.operationalmetrics.service.DoraMetricsService
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowService
 
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class Schedulers @Inject()(
   doraMetricsService  : DoraMetricsService
+, serviceNowService   : ServiceNowService
 , configuration       : Configuration
 , mongoLockRepository : MongoLockRepository
 , timestampSupport    : TimestampSupport
@@ -65,3 +68,8 @@ class Schedulers @Inject()(
     doraMetricsService
       .updateServiceLeadTimes()
       .map(_ => logger.info("Finished updating Service Lead Times"))
+    
+  scheduleWithLock("ServiceNow mappings updater", "service-now-mappings-updater"):
+    serviceNowService
+      .updateServiceNowMappings()
+      .map(_ => logger.info("Finished updating ServiceNow mappings"))

@@ -23,7 +23,7 @@ import play.api.{Configuration, Logging}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.mongo.workitem.{ProcessingStatus, WorkItem}
 import uk.gov.hmrc.operationalmetrics.model.{DeploymentEvent, Version}
-import uk.gov.hmrc.operationalmetrics.persistence.DeploymentEventsQueueRepository
+import uk.gov.hmrc.operationalmetrics.persistence.{DeploymentEventsQueueRepository, ServiceNowMappingsRepository}
 import uk.gov.hmrc.operationalmetrics.connector.{ArtefactProcessorConnector, ReleasesConnector}
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
@@ -37,6 +37,7 @@ import cats.implicits.*
 @Singleton
 class ServiceNowEventStreamRunner @Inject()(
   repo                      : DeploymentEventsQueueRepository
+, serviceNowMapping         : ServiceNowMappingsRepository
 , config                    : Configuration
 , releasesConnector         : ReleasesConnector
 , artefactProcessorConnector: ArtefactProcessorConnector
@@ -108,6 +109,7 @@ class ServiceNowEventStreamRunner @Inject()(
                              case Some(_) => Future.unit
       branch          =  metaArtefact.flatMap(_.gitBranch).getOrElse(if event.version.isHotfix then "hotfix" else "main")
       commitIds       =  metaArtefact.flatMap(_.gitCommit).toSeq ++ event.config.map(_.commitId)
+      cmdbCI          <- serviceNowMapping.find(event.serviceName.asString).map(_.fold("Default")(_.something)) // if not found provides a default
       serviceNowEvent =  ServiceNowEvent(
                            requestedBy          = event.userName
                          , shortDescription     = deploymentDescription(event, previous.map(_.version))
@@ -123,6 +125,7 @@ class ServiceNowEventStreamRunner @Inject()(
                          , implementationResult = event.eventType
                          , service              = event.serviceName
                          , configurationItem    = event.serviceName
+                         , cmdbCI               = cmdbCI
                          )
       _               <- serviceNowConnector.sendToServiceNow(serviceNowEvent)
       _               =  logger.info(

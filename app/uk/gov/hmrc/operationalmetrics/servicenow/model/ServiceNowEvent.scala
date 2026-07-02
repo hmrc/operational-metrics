@@ -33,12 +33,13 @@ case class ServiceNowEvent(
 , commitIds           : Seq[CommitId]
 , artefact            : String
 , testResults         : String = "Pass"
-, startDateTime       : Instant
+, startDateTime       : Instant // - 1 hour from end date
 , endDateTime         : Instant
 , deploymentStatus    : ECSEventType
 , implementationResult: ECSEventType
 , service             : ServiceName 
 , configurationItem   : ServiceName
+, cmdbCI              : String
 )
 
 object ServiceNowEvent:
@@ -59,4 +60,5 @@ object ServiceNowEvent:
     ~ (__ \ "implementationResult").write[ECSEventType]
     ~ (__ \ "service"             ).write[ServiceName]
     ~ (__ \ "configurationItem"   ).write[ServiceName]
+    ~ (__ \ "cmdb_ci"             ).write[String]
     )(sne => Tuple.fromProductTyped(sne))
