@@ -58,9 +58,6 @@ class ServiceNowMappingsRepository @Inject()(
     ).map(_ => ())
 
 object ServiceNowMappingsRepository:
-  val defaultCmdbCI: String =
-    "Default"
-
   case class ServiceNowMapping(
     name  : String
   , cmdbCI: String

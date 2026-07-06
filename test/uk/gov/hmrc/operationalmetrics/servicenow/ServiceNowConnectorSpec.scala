@@ -39,7 +39,10 @@ class ServiceNowConnectorSpec
     with WireMockSupport:
 
   private val config =
-    Configuration.from(Map("servicenow.url" -> wireMockUrl)).withFallback(Configuration(ConfigFactory.load()))
+    Configuration.from(Map(
+      "servicenow.url"           -> wireMockUrl
+    , "servicenow.authorization" -> "Bearer test-token"
+    )).withFallback(Configuration(ConfigFactory.load()))
 
   private lazy val serviceNowConnector: ServiceNowConnector =
     ServiceNowConnector(httpClientV2, config)
@@ -67,6 +70,7 @@ class ServiceNowConnectorSpec
     "return unit when ServiceNow responds with 201" in:
       stubFor(
         post(urlEqualTo("/api"))
+          .withHeader("Authorization", equalTo("Bearer test-token"))
           .withRequestBody(equalToJson(Json.toJson(serviceNowEvent).toString))
           .willReturn(
             aResponse()

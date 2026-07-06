@@ -40,7 +40,9 @@ case class SqsConfig(
   keyPrefix    : String
 , configuration: Configuration
 ):
-  lazy val endpointOverride   : Option[String] = configuration.getOptional[String](s"$keyPrefix.endpointOverride")
+  lazy val endpointOverride: Option[String] =
+    configuration.getOptional[String](s"$keyPrefix.endpointOverride").filter(_.trim.nonEmpty)
+
   lazy val queueUrl           : URL            = URI.create(configuration.get[String](s"$keyPrefix.queueUrl")).toURL
   lazy val maxNumberOfMessages: Int            = configuration.get[Int](s"$keyPrefix.maxNumberOfMessages")
   lazy val waitTimeSeconds    : Int            = configuration.get[Int](s"$keyPrefix.waitTimeSeconds")

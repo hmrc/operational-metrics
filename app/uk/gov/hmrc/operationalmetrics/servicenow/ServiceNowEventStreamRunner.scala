@@ -24,7 +24,6 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.mongo.workitem.{ProcessingStatus, WorkItem}
 import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentEvent, Version}
 import uk.gov.hmrc.operationalmetrics.persistence.{DeploymentEventsQueueRepository, ServiceNowMappingsRepository}
-import uk.gov.hmrc.operationalmetrics.persistence.ServiceNowMappingsRepository.defaultCmdbCI
 import uk.gov.hmrc.operationalmetrics.connector.{ArtefactProcessorConnector, ReleasesConnector}
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
@@ -50,6 +49,7 @@ class ServiceNowEventStreamRunner @Inject()(
 
   private val initialDelay: FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.initialDelay").toMillis.millis
   private val interval    : FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.interval"    ).toMillis.millis
+  private val defaultCmdbCI: String         = config.get[String]("servicenow.default-cmdb-ci")
 
   private given             HeaderCarrier  = HeaderCarrier()
 

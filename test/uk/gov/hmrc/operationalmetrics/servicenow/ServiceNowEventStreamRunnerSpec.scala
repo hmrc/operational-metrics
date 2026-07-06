@@ -36,7 +36,7 @@ import uk.gov.hmrc.operationalmetrics.connector.{ArtefactProcessorConnector, Rel
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
 import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentConfigFile, DeploymentEvent, Environment, FileName, RepoName, ServiceName, UserName, Version}
 import uk.gov.hmrc.operationalmetrics.persistence.{DeploymentEventsQueueRepository, ServiceNowMappingsRepository}
-import uk.gov.hmrc.operationalmetrics.persistence.ServiceNowMappingsRepository.{ServiceNowMapping, defaultCmdbCI}
+import uk.gov.hmrc.operationalmetrics.persistence.ServiceNowMappingsRepository.ServiceNowMapping
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -323,6 +323,7 @@ class ServiceNowEventStreamRunnerSpec
         "servicenow-stream.enabled"                  -> "false"
       , "servicenow-stream.source-tick.initialDelay" -> "1.second"
       , "servicenow-stream.source-tick.interval"     -> "1.second"
+      , "servicenow.default-cmdb-ci"                  -> "default-service-now-mapping"
       , "queue.retryInterval"                        -> "1.second"
       )
 
@@ -332,6 +333,7 @@ class ServiceNowEventStreamRunnerSpec
     val mockAPConnector                  : ArtefactProcessorConnector      = mock[ArtefactProcessorConnector]
     val mockRConnector                   : ReleasesConnector               = mock[ReleasesConnector]
     val serviceNowMapping                : ServiceNowMapping               = ServiceNowMapping("service-1", "service-now-mapping-1")
+    val defaultCmdbCI                    : String                          = "default-service-now-mapping"
 
     when(mockServiceNowMappingsRepository.find(any[String]))
       .thenReturn(Future.successful(Some(serviceNowMapping)))

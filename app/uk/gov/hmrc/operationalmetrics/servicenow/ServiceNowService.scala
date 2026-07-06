@@ -24,19 +24,20 @@ import uk.gov.hmrc.operationalmetrics.persistence.ServiceNowMappingsRepository
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import org.yaml.snakeyaml.Yaml
-import play.api.Logging
+import play.api.{Configuration, Logging}
 import uk.gov.hmrc.operationalmetrics.persistence.ServiceNowMappingsRepository.ServiceNowMapping
 
 @Singleton
 class ServiceNowService @Inject() (
   teamsAndRepositoriesConnector: TeamsAndRepositoriesConnector
 , serviceNowMappingsRepository : ServiceNowMappingsRepository
+, config                       : Configuration
 )(using
   ec: ExecutionContext
 ) extends Logging:
 
   private val serviceNowMappingKey: String =
-    "serviceNowMapping"
+    config.get[String]("servicenow.repository-yaml-mapping-key")
 
   private def toMappings(repos: Seq[GitRepository]): Seq[ServiceNowMapping] =
     repos.flatMap: repo =>

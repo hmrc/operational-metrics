@@ -22,6 +22,7 @@ import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
+import play.api.Configuration
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.operationalmetrics.connector.TeamsAndRepositoriesConnector
 import uk.gov.hmrc.operationalmetrics.connector.TeamsAndRepositoriesConnector.GitRepository
@@ -50,15 +51,16 @@ class ServiceNowServiceSpec
         ServiceNowService(
           teamsAndRepositoriesConnector
         , serviceNowMappingsRepository
+        , Configuration("servicenow.repository-yaml-mapping-key" -> "serviceNowConfigurationItem")
         )
 
       when(teamsAndRepositoriesConnector.getAllServiceRepos()(using any[HeaderCarrier]))
         .thenReturn(Future.successful(
           Seq(
-            GitRepository("service-1", Some("serviceNowMapping: service-now-mapping-1"))
-          , GitRepository("service-2", Some("serviceNowMapping: '  service-now-mapping-2  '"))
+            GitRepository("service-1", Some("serviceNowConfigurationItem: service-now-mapping-1"))
+          , GitRepository("service-2", Some("serviceNowConfigurationItem: '  service-now-mapping-2  '"))
           , GitRepository("service-3", Some("repoVisibility: public"))
-          , GitRepository("service-4", Some("serviceNowMapping: ''"))
+          , GitRepository("service-4", Some("serviceNowConfigurationItem: ''"))
           , GitRepository("service-5", Some("not valid: ["))
           , GitRepository("service-6", None)
           )
