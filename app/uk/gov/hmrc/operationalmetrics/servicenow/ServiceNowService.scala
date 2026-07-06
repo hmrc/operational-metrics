@@ -35,20 +35,22 @@ class ServiceNowService @Inject() (
   ec: ExecutionContext
 ) extends Logging:
 
+  private val serviceNowMappingKey: String =
+    "serviceNowMapping"
+
   private def toMappings(repos: Seq[GitRepository]): Seq[ServiceNowMapping] =
     repos.flatMap: repo =>
       serviceNowMapping(repo).map(v => ServiceNowMapping(repo.name, v))
 
   private def serviceNowMapping(repo: GitRepository): Option[String] =
     repo.repositoryYamlText
-      .flatMap(text => scala.util.Try(new Yaml().load(text).asInstanceOf[AnyRef]).toOption)
-      .collect { case m: java.util.Map[String, AnyRef] @unchecked => m }
-      .flatMap(m => Option(m.get("serviceNowMapping")))
+      .flatMap(text => scala.util.Try(Option(new Yaml().load[AnyRef](text))).toOption.flatten)
+      .collect { case m: java.util.Map[?, ?] @unchecked => m }
+      .flatMap(m => Option(m.get(serviceNowMappingKey)))
       .map(_.toString)
+      .map(_.trim)
+      .filter(_.nonEmpty)
   
-  // currently only updates for repos when repository.yaml contains "serviceNowMapping" key
-  // we could store a default for all repos when it doesn't exist
-  // however I went for a different approach and set a default when the find() in ServiceNowEventStreamRunner returns None
   def updateServiceNowMappings()(using HeaderCarrier): Future[Unit] =
     for
       repos    <- teamsAndRepositoriesConnector.getAllServiceRepos()

@@ -58,13 +58,16 @@ class ServiceNowMappingsRepository @Inject()(
     ).map(_ => ())
 
 object ServiceNowMappingsRepository:
+  val defaultCmdbCI: String =
+    "Default"
+
   case class ServiceNowMapping(
-    name     : String
-  , something: String
+    name  : String
+  , cmdbCI: String
   )
   
   object ServiceNowMapping:
     val mongoFormat: Format[ServiceNowMapping] =
-      ( (__ \ "name"       ).format[String]
-      ~ (__ \ "something"  ).format[String]
+      ( (__ \ "name"  ).format[String]
+      ~ (__ \ "cmdbCI").format[String]
       )(ServiceNowMapping.apply, snm => Tuple.fromProductTyped(snm))    

@@ -35,7 +35,8 @@ import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.HistoricDeploy
 import uk.gov.hmrc.operationalmetrics.connector.{ArtefactProcessorConnector, ReleasesConnector}
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
 import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentConfigFile, DeploymentEvent, Environment, FileName, RepoName, ServiceName, UserName, Version}
-import uk.gov.hmrc.operationalmetrics.persistence.DeploymentEventsQueueRepository
+import uk.gov.hmrc.operationalmetrics.persistence.{DeploymentEventsQueueRepository, ServiceNowMappingsRepository}
+import uk.gov.hmrc.operationalmetrics.persistence.ServiceNowMappingsRepository.{ServiceNowMapping, defaultCmdbCI}
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -260,11 +261,12 @@ class ServiceNowEventStreamRunnerSpec
 
       onTest.process(workItem.item.copy(version = Version(1, 0, 1, "1.0.1"))).futureValue
 
-      verify(mockSNConnector, times(1)).sendToServiceNow(eqTo(serviceNowEvent.copy(
-        shortDescription = "service-1 1.0.1 deployed in Production (previously deployed version 1.0.0)"
-      , branch           = "hotfix"
-      , commitIds        = Seq(CommitId("config-commit-id-1"), CommitId("config-commit-id-2")) // no repo commit since no metaArtefact
-      )))
+      val event            = workItem.item.copy(version = Version(1, 0, 1, "1.0.1"))
+      val shortDescription = "service-1 1.0.1 deployed in Production (previously deployed version 1.0.0)"
+      val commitIds        = Seq(CommitId("config-commit-id-1"), CommitId("config-commit-id-2"))
+      verify(mockSNConnector, times(1)).sendToServiceNow(eqTo(
+        serviceNowEventFor(event, shortDescription, "hotfix", commitIds)
+      ))
 
     "derive branch as main via version when no meta artefact found" in new Setup:
       when(mockRConnector.previousDeployment(any[ServiceName], any[Environment], any[java.time.Instant])(using any))
@@ -276,10 +278,42 @@ class ServiceNowEventStreamRunnerSpec
 
       onTest.process(workItem.item).futureValue
 
-      verify(mockSNConnector, times(1)).sendToServiceNow(eqTo(serviceNowEvent.copy(
-          branch    = "main"
-        , commitIds = Seq(CommitId("config-commit-id-1"), CommitId("config-commit-id-2")) // no repo commit since no metaArtefact
-      )))
+      val commitIds = Seq(CommitId("config-commit-id-1"), CommitId("config-commit-id-2"))
+      verify(mockSNConnector, times(1)).sendToServiceNow(eqTo(
+        serviceNowEventFor(branch = "main", commitIds = commitIds)
+      ))
+
+    "send default cmdb ci when no repository.yaml mapping exists" in new Setup:
+      when(mockRConnector.previousDeployment(any[ServiceName], any[Environment], any[java.time.Instant])(using any))
+        .thenReturn(Future.successful(Some(historicDeployment)))
+      when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
+        .thenReturn(Future.successful(Some(metaArtefact)))
+      when(mockServiceNowMappingsRepository.find(any[String]))
+        .thenReturn(Future.successful(None))
+      when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
+        .thenReturn(Future.successful(()))
+
+      onTest.process(workItem.item).futureValue
+
+      verify(mockSNConnector, times(1)).sendToServiceNow(eqTo(
+        serviceNowEvent.copy(cmdbCI = defaultCmdbCI)
+      ))
+
+    "build a single string description containing the former payload fields" in new Setup:
+      val description =
+        onTest.serviceNowDescription(
+          workItem.item
+        , serviceNowEvent.shortDescription
+        , repository
+        , "main"
+        , Seq(CommitId("repo-commit-id"), CommitId("config-commit-id-1"), CommitId("config-commit-id-2"))
+        )
+
+      description should include("Pipeline execution ID: 123")
+      description should include("Repository: https://github.com/hmrc/service-1")
+      description should include("Branch: main")
+      description should include("Commit IDs: repo-commit-id, config-commit-id-1, config-commit-id-2")
+      description should include("Deployment status: deployment-complete")
 
   trait Setup:
     given HeaderCarrier = HeaderCarrier()
@@ -292,11 +326,25 @@ class ServiceNowEventStreamRunnerSpec
       , "queue.retryInterval"                        -> "1.second"
       )
 
-    val mockRepo       : DeploymentEventsQueueRepository = mock[DeploymentEventsQueueRepository]
-    val mockSNConnector: ServiceNowConnector             = mock[ServiceNowConnector]
-    val mockAPConnector: ArtefactProcessorConnector      = mock[ArtefactProcessorConnector]
-    val mockRConnector : ReleasesConnector               = mock[ReleasesConnector]
-    val onTest         : ServiceNowEventStreamRunner     = ServiceNowEventStreamRunner(mockRepo, mockConfig, mockRConnector, mockAPConnector, mockSNConnector)
+    val mockRepo                         : DeploymentEventsQueueRepository = mock[DeploymentEventsQueueRepository]
+    val mockServiceNowMappingsRepository : ServiceNowMappingsRepository    = mock[ServiceNowMappingsRepository]
+    val mockSNConnector                  : ServiceNowConnector             = mock[ServiceNowConnector]
+    val mockAPConnector                  : ArtefactProcessorConnector      = mock[ArtefactProcessorConnector]
+    val mockRConnector                   : ReleasesConnector               = mock[ReleasesConnector]
+    val serviceNowMapping                : ServiceNowMapping               = ServiceNowMapping("service-1", "service-now-mapping-1")
+
+    when(mockServiceNowMappingsRepository.find(any[String]))
+      .thenReturn(Future.successful(Some(serviceNowMapping)))
+
+    val onTest: ServiceNowEventStreamRunner =
+      ServiceNowEventStreamRunner(
+        mockRepo
+      , mockServiceNowMappingsRepository
+      , mockConfig
+      , mockRConnector
+      , mockAPConnector
+      , mockSNConnector
+      )
 
     val deploymentConfigFile1 =
       DeploymentConfigFile(
@@ -354,20 +402,21 @@ class ServiceNowEventStreamRunnerSpec
     def deploymentEvent(eventType: ECSEventType): DeploymentEvent =
       workItem.item.copy(eventType = eventType)
 
-    val serviceNowEvent =
+    val repository = s"https://github.com/hmrc/service-1"
+
+    def serviceNowEventFor(
+      event           : DeploymentEvent = workItem.item
+    , shortDescription: String          = s"service-1 ${workItem.item.version.original} deployed in Production (previously deployed version 1.0.0)"
+    , branch          : String          = "main"
+    , commitIds       : Seq[CommitId]   = Seq(CommitId("repo-commit-id"), CommitId("config-commit-id-1"), CommitId("config-commit-id-2"))
+    , cmdbCI          : String          = serviceNowMapping.cmdbCI
+    ): ServiceNowEvent =
       ServiceNowEvent(
-        requestedBy          = UserName("user-1")
-      , shortDescription     = s"service-1 ${workItem.item.version.original} deployed in Production (previously deployed version 1.0.0)"
-      , pipelineExecutionId  = "123"
-      , repository           = s"https://github.com/hmrc/service-1"
-      , branch               = "main"
-      , commitIds            = Seq(CommitId("repo-commit-id"), CommitId("config-commit-id-1"), CommitId("config-commit-id-2"))
-      , artefact             = "uri"
-      , testResults          = "Pass"
-      , startDateTime        = workItem.item.time
-      , endDateTime          = workItem.item.time
-      , deploymentStatus     = ECSEventType.DeploymentComplete
-      , implementationResult = ECSEventType.DeploymentComplete
-      , service              = ServiceName("service-1")
-      , configurationItem    = ServiceName("service-1")
+        requestedBy          = event.userName
+      , shortDescription     = shortDescription
+      , description          = onTest.serviceNowDescription(event, shortDescription, repository, branch, commitIds)
+      , cmdbCI               = cmdbCI
       )
+
+    val serviceNowEvent: ServiceNowEvent =
+      serviceNowEventFor()

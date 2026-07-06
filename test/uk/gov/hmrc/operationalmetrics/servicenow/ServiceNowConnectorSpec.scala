@@ -25,11 +25,9 @@ import play.api.Configuration
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
-import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
-import uk.gov.hmrc.operationalmetrics.model.{CommitId, ServiceName, UserName}
+import uk.gov.hmrc.operationalmetrics.model.UserName
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
 
-import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class ServiceNowConnectorSpec
@@ -52,19 +50,18 @@ class ServiceNowConnectorSpec
     ServiceNowEvent(
       requestedBy          = UserName("user-1")
     , shortDescription     = "service-1 1.0.0 deployed in Production"
-    , pipelineExecutionId  = "123"
-    , repository           = "https://github.com/hmrc/service-1"
-    , branch               = "main"
-    , commitIds            = Seq(CommitId("abc123"))
-    , artefact             = "uri"
-    , testResults          = "Pass"
-    , startDateTime        = Instant.parse("2020-05-21T12:36:23.953Z")
-    , endDateTime          = Instant.parse("2020-05-21T12:36:23.953Z")
-    , deploymentStatus     = ECSEventType.DeploymentComplete
-    , implementationResult = ECSEventType.DeploymentComplete
-    , service              = ServiceName("service-1")
-    , configurationItem    = ServiceName("service-1")
+    , description          = "Pipeline execution ID: 123\nRepository: https://github.com/hmrc/service-1"
+    , cmdbCI               = "service-now-mapping-1"
     )
+
+  "ServiceNowEvent JSON" should:
+    "write description as a single string and omit the old top-level detail fields" in:
+      val json = Json.toJson(serviceNowEvent)
+
+      (json \ "description").as[String] shouldBe "Pipeline execution ID: 123\nRepository: https://github.com/hmrc/service-1"
+      (json \ "cmdb_ci"    ).as[String] shouldBe "service-now-mapping-1"
+      (json \ "repository" ).toOption shouldBe None
+      (json \ "commitIds"  ).toOption shouldBe None
 
   "POST sendToServiceNow" should:
     "return unit when ServiceNow responds with 201" in:

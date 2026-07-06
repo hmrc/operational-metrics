@@ -46,7 +46,6 @@ class ServiceNowConnector @Inject() (
       .post(url"$url/api")
       .setHeader("Authorization"  -> "Something"       )
       .setHeader("Content-Type"   -> "application/json")
-      //.withProxy
       .withBody(Json.toJson(body))
       .execute[Either[UpstreamErrorResponse, HttpResponse]]
         .flatMap:

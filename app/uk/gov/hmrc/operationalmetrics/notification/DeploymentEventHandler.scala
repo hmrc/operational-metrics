@@ -26,6 +26,7 @@ import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
 import uk.gov.hmrc.operationalmetrics.persistence.DeploymentEventsQueueRepository
 
 import javax.inject.{Inject, Singleton}
+import java.util.Locale
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
@@ -40,12 +41,24 @@ class DeploymentEventHandler @Inject()(
 , config = SqsConfig("aws.sqs.deployment", configuration)
 )(using actorSystem, ec):
 
+  private lazy val allowList: DeploymentEventHandler.AllowList =
+    DeploymentEventHandler.AllowList.fromConfig(configuration)
+
   private def prefixLog(
     message: Message
   , payload: DeploymentEvent
   ): String =
     s"Deployment Event message with ID: ${message.messageId()} event type: ${payload.eventType.value} " +
     s"and details: ${payload.serviceName.asString} ${payload.version.original} ${payload.environment.asString}."
+
+  private def enqueue(payload: DeploymentEvent, message: Message): Future[Unit] =
+    if allowList.allows(payload) then
+      repository
+        .pushNew(payload)
+        .map: _ =>
+          logger.info(s"Successfully pushed to work item repo: ${prefixLog(message, payload)}")
+    else
+      Future.successful(logger.info(s"Skipping non-allowlisted deployment event: ${prefixLog(message, payload)}"))
 
   override private[notification] def processMessage(message: Message): Future[MessageAction] =
     logger.info(s"Starting processing Deployment Event message with ID: ${message.messageId()}")
@@ -66,11 +79,7 @@ class DeploymentEventHandler @Inject()(
       _       <- payload.eventType match
                    case ECSEventType.DeploymentComplete
                       | ECSEventType.UnDeploymentFailed
-                      | ECSEventType.UnDeploymentComplete => EitherT.right[String]:
-                                                               repository
-                                                                 .pushNew(payload) // insert into work item repo
-                                                                 .map: _ =>
-                                                                   logger.info(s"Successfully pushed to work item repo: ${prefixLog(message, payload)}")
+                      | ECSEventType.UnDeploymentComplete => EitherT.right[String](enqueue(payload, message))
                    case _                                 => EitherT.right[String](Future.unit)
       _       =  logger.info(s"Successfully processed: ${prefixLog(message, payload)}")
     yield
@@ -78,3 +87,28 @@ class DeploymentEventHandler @Inject()(
     ).value.map:
       case Left(error)   => logger.error(error); MessageAction.Ignore(message)
       case Right(action) => action
+
+object DeploymentEventHandler:
+  final case class AllowList(
+    environments: Seq[String]
+  , services    : Seq[String]
+  ):
+    private def allows(allowList: Seq[String], value: String): Boolean =
+      allowList.isEmpty || allowList.contains(AllowList.normalise(value))
+
+    def allows(event: DeploymentEvent): Boolean =
+      allows(environments, event.environment.asString) &&
+        allows(services, event.serviceName.asString)
+
+  object AllowList:
+    private val configKey =
+      "deployment-event-handler.allow-list"
+
+    private def normalise(value: String): String =
+      value.trim.toLowerCase(Locale.ROOT)
+
+    def fromConfig(configuration: Configuration): AllowList =
+      AllowList(
+        environments = configuration.getOptional[Seq[String]](s"$configKey.environments").getOrElse(Seq("production")).map(normalise)
+      , services     = configuration.getOptional[Seq[String]](s"$configKey.services"    ).getOrElse(Seq.empty          ).map(normalise)
+      )
