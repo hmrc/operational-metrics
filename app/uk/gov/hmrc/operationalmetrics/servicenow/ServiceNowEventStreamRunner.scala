@@ -107,6 +107,7 @@ class ServiceNowEventStreamRunner @Inject()(
   , branch          : String
   , commitIds       : Seq[CommitId]
   ): String =
+    val startTime = event.time.minusSeconds(10.minutes.toSeconds)
     Seq(
       "Requested by"          -> event.userName.asString
     , "Assignment group"      -> ServiceNowEvent.defaultAssignmentGroup
@@ -117,7 +118,7 @@ class ServiceNowEventStreamRunner @Inject()(
     , "Commit IDs"            -> commitIds.map(_.asString).mkString(", ")
     , "Artefact"              -> event.slugUri
     , "Test results"          -> "Pass"
-    , "Start date time"       -> event.time.toString
+    , "Start date time"       -> startTime.toString
     , "End date time"         -> event.time.toString
     , "Deployment status"     -> event.eventType.value
     , "Implementation result" -> event.eventType.value

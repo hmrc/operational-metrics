@@ -71,7 +71,7 @@ class DeploymentEventHandler @Inject()(
                      .map(_.copy(messageId = message.messageId()))
                      .map: event =>
                              if   event.userName == UserName.unknown
-                             then logger.warn(s"Unknown deployer_principal for message ID: ${message.messageId()}") // how many of these events do we receive
+                             then logger.warn(s"Unknown deployer_principal for message ID: ${message.messageId()}")
                                   event
                      .left
                      .map: error =>
@@ -110,5 +110,5 @@ object DeploymentEventHandler:
     def fromConfig(configuration: Configuration): AllowList =
       AllowList(
         environments = configuration.getOptional[Seq[String]](s"$configKey.environments").getOrElse(Seq("production")).map(normalise)
-      , services     = configuration.getOptional[Seq[String]](s"$configKey.services"    ).getOrElse(Seq.empty          ).map(normalise)
+      , services     = configuration.getOptional[Seq[String]](s"$configKey.services").getOrElse(Seq.empty).map(normalise)
       )
