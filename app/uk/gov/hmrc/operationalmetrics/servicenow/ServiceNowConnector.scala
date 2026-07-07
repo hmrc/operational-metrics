@@ -37,6 +37,7 @@ class ServiceNowConnector @Inject() (
   import HttpReads.Implicits.*
 
   private val url = config.get[String]("servicenow.url")
+  private val authorization = config.get[String]("servicenow.authorization")
 
   given HeaderCarrier = HeaderCarrier()
   
@@ -44,10 +45,10 @@ class ServiceNowConnector @Inject() (
     given Writes[ServiceNowEvent] = ServiceNowEvent.writes
     httpClientV2
       .post(url"$url/api")
-      .setHeader("Authorization"  -> "Something"       )
+      .setHeader("Authorization"  -> authorization     )
       .setHeader("Content-Type"   -> "application/json")
-      //.withProxy
       .withBody(Json.toJson(body))
+      .withProxy
       .execute[Either[UpstreamErrorResponse, HttpResponse]]
         .flatMap:
           case Right(r) if r.status == Status.CREATED => Future.unit

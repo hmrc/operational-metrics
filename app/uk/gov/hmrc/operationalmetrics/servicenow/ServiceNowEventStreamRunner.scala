@@ -22,8 +22,8 @@ import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import play.api.{Configuration, Logging}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.mongo.workitem.{ProcessingStatus, WorkItem}
-import uk.gov.hmrc.operationalmetrics.model.{DeploymentEvent, Version}
-import uk.gov.hmrc.operationalmetrics.persistence.DeploymentEventsQueueRepository
+import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentEvent, Version}
+import uk.gov.hmrc.operationalmetrics.persistence.{DeploymentEventsQueueRepository, ServiceNowMappingsRepository}
 import uk.gov.hmrc.operationalmetrics.connector.{ArtefactProcessorConnector, ReleasesConnector}
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
@@ -37,6 +37,7 @@ import cats.implicits.*
 @Singleton
 class ServiceNowEventStreamRunner @Inject()(
   repo                      : DeploymentEventsQueueRepository
+, serviceNowMapping         : ServiceNowMappingsRepository
 , config                    : Configuration
 , releasesConnector         : ReleasesConnector
 , artefactProcessorConnector: ArtefactProcessorConnector
@@ -48,6 +49,7 @@ class ServiceNowEventStreamRunner @Inject()(
 
   private val initialDelay: FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.initialDelay").toMillis.millis
   private val interval    : FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.interval"    ).toMillis.millis
+  private val defaultCmdbCI: String         = config.get[String]("servicenow.default-cmdb-ci")
 
   private given             HeaderCarrier  = HeaderCarrier()
 
@@ -98,6 +100,32 @@ class ServiceNowEventStreamRunner @Inject()(
                                                   case None                                => s"$service $ver deployed in $env"
       case other                             => throw RuntimeException(s"Unexpected event type for service now description: $other")
 
+  private[servicenow] def serviceNowDescription(
+    event           : DeploymentEvent
+  , shortDescription: String
+  , repository      : String
+  , branch          : String
+  , commitIds       : Seq[CommitId]
+  ): String =
+    Seq(
+      "Requested by"          -> event.userName.asString
+    , "Assignment group"      -> ServiceNowEvent.defaultAssignmentGroup
+    , "Short description"     -> shortDescription
+    , "Pipeline execution ID" -> event.deploymentId
+    , "Repository"            -> repository
+    , "Branch"                -> branch
+    , "Commit IDs"            -> commitIds.map(_.asString).mkString(", ")
+    , "Artefact"              -> event.slugUri
+    , "Test results"          -> "Pass"
+    , "Start date time"       -> event.time.toString
+    , "End date time"         -> event.time.toString
+    , "Deployment status"     -> event.eventType.value
+    , "Implementation result" -> event.eventType.value
+    , "Service"               -> event.serviceName.asString
+    , "Configuration item"    -> event.serviceName.asString
+    ).map { case (key, value) => s"$key: $value" }
+     .mkString("\n")
+
   private[servicenow] def process(event: DeploymentEvent): Future[Unit] =
     for
       previous        <- releasesConnector.previousDeployment(event.serviceName, event.environment, event.time)
@@ -108,21 +136,14 @@ class ServiceNowEventStreamRunner @Inject()(
                              case Some(_) => Future.unit
       branch          =  metaArtefact.flatMap(_.gitBranch).getOrElse(if event.version.isHotfix then "hotfix" else "main")
       commitIds       =  metaArtefact.flatMap(_.gitCommit).toSeq ++ event.config.map(_.commitId)
+      cmdbCI          <- serviceNowMapping.find(event.serviceName.asString).map(_.fold(defaultCmdbCI)(_.cmdbCI))
+      repository      =  s"https://github.com/hmrc/${event.serviceName.asString}"
+      shortDescription = deploymentDescription(event, previous.map(_.version))
       serviceNowEvent =  ServiceNowEvent(
                            requestedBy          = event.userName
-                         , shortDescription     = deploymentDescription(event, previous.map(_.version))
-                         , pipelineExecutionId  = event.deploymentId
-                         , repository           = s"https://github.com/hmrc/${event.serviceName.asString}"
-                         , branch               = branch
-                         , commitIds            = commitIds
-                         , artefact             = event.slugUri
-                         , testResults          = "Pass"
-                         , startDateTime        = event.time
-                         , endDateTime          = event.time
-                         , deploymentStatus     = event.eventType
-                         , implementationResult = event.eventType
-                         , service              = event.serviceName
-                         , configurationItem    = event.serviceName
+                         , shortDescription     = shortDescription
+                         , description          = serviceNowDescription(event, shortDescription, repository, branch, commitIds)
+                         , cmdbCI               = cmdbCI
                          )
       _               <- serviceNowConnector.sendToServiceNow(serviceNowEvent)
       _               =  logger.info(
