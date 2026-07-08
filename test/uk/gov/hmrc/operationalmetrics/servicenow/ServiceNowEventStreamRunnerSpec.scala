@@ -313,6 +313,8 @@ class ServiceNowEventStreamRunnerSpec
       description should include("Repository: https://github.com/hmrc/service-1")
       description should include("Branch: main")
       description should include("Commit IDs: repo-commit-id, config-commit-id-1, config-commit-id-2")
+      description should include(s"Start date time: ${workItem.item.time.minusSeconds(600)}")
+      description should include(s"End date time: ${workItem.item.time}")
       description should include("Deployment status: deployment-complete")
 
   trait Setup:
