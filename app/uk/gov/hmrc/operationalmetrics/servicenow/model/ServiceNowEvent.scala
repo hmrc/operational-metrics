@@ -16,26 +16,47 @@
 
 package uk.gov.hmrc.operationalmetrics.servicenow.model
 
-import play.api.libs.functional.syntax.toFunctionalBuilderOps
-import play.api.libs.json.{Writes, __}
-import uk.gov.hmrc.operationalmetrics.model.UserName
+import play.api.libs.json.{Json, Writes}
+
+import java.time.{Instant, ZoneId}
+import java.time.format.DateTimeFormatter
 
 case class ServiceNowEvent(
-  requestedBy     : UserName
-, assignmentGroup : String = "DevOps"
-, shortDescription: String
-, description     : String
-, cmdbCI          : String
+  shortDescription  : String
+, description       : String
+, cmdbCI            : String
+, workStart         : Instant
+, workEnd           : Instant
+, correlationId     : String
+, closeCode         : String = ServiceNowEvent.defaultCloseCode
+, correlationDisplay: String = ServiceNowEvent.defaultCorrelationDisplay
 )
 
 object ServiceNowEvent:
   val defaultAssignmentGroup: String =
     "DevOps"
 
+  val defaultCloseCode: String =
+    "successful"
+
+  val defaultCorrelationDisplay: String =
+    "MDTP"
+
+  private val dateFormat =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(ZoneId.of("Europe/London"))
+
   given writes: Writes[ServiceNowEvent] =
-    ( (__ \ "requestedBy"     ).write[UserName]
-    ~ (__ \ "assignmentGroup" ).write[String]
-    ~ (__ \ "shortDescription").write[String]
-    ~ (__ \ "description"     ).write[String]
-    ~ (__ \ "cmdb_ci"         ).write[String]
-    )(sne => Tuple.fromProductTyped(sne))
+    Writes { sne =>
+      Json.arr(
+        Json.obj(
+          "short_description"   -> sne.shortDescription
+        , "description"         -> sne.description
+        , "cmdb_ci"             -> sne.cmdbCI
+        , "work_start"          -> dateFormat.format(sne.workStart)
+        , "work_end"            -> dateFormat.format(sne.workEnd)
+        , "close_code"          -> sne.closeCode
+        , "correlation_id"      -> sne.correlationId
+        , "correlation_display" -> sne.correlationDisplay
+        )
+      )
+    }

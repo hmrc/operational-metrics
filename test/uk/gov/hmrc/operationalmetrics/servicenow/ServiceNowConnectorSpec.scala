@@ -25,7 +25,6 @@ import play.api.Configuration
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
-import uk.gov.hmrc.operationalmetrics.model.UserName
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
 
 import java.time.{Clock, Duration, Instant, ZoneId, ZoneOffset}
@@ -62,20 +61,34 @@ class ServiceNowConnectorSpec
 
   private val serviceNowEvent =
     ServiceNowEvent(
-      requestedBy          = UserName("user-1")
-    , shortDescription     = "service-1 1.0.0 deployed in Production"
+      shortDescription     = "service-1 1.0.0 deployed in Production"
     , description          = "Pipeline execution ID: 123\nRepository: https://github.com/hmrc/service-1"
     , cmdbCI               = "service-now-mapping-1"
+    , workStart            = Instant.parse("2026-05-15T15:24:19Z")
+    , workEnd              = Instant.parse("2026-05-15T16:24:19Z")
+    , correlationId        = "edge-123"
     )
 
   "ServiceNowEvent JSON" should:
-    "write description as a single string and omit the old top-level detail fields" in:
+    "write the ServiceNow payload as a single-element array with expected field names" in:
       val json = Json.toJson(serviceNowEvent)
+      val payload: play.api.libs.json.JsValue =
+        json match
+          case play.api.libs.json.JsArray(values) if values.size == 1 => values.head
+          case other                                                  => fail(s"Expected single-element array, got $other")
 
-      (json \ "description").as[String] shouldBe "Pipeline execution ID: 123\nRepository: https://github.com/hmrc/service-1"
-      (json \ "cmdb_ci"    ).as[String] shouldBe "service-now-mapping-1"
-      (json \ "repository" ).toOption shouldBe None
-      (json \ "commitIds"  ).toOption shouldBe None
+      (payload \ "short_description"  ).as[String] shouldBe "service-1 1.0.0 deployed in Production"
+      (payload \ "description"        ).as[String] shouldBe "Pipeline execution ID: 123\nRepository: https://github.com/hmrc/service-1"
+      (payload \ "cmdb_ci"            ).as[String] shouldBe "service-now-mapping-1"
+      (payload \ "work_start"         ).as[String] shouldBe "15/05/2026 16:24:19"
+      (payload \ "work_end"           ).as[String] shouldBe "15/05/2026 17:24:19"
+      (payload \ "close_code"         ).as[String] shouldBe "successful"
+      (payload \ "correlation_id"     ).as[String] shouldBe "edge-123"
+      (payload \ "correlation_display").as[String] shouldBe "MDTP"
+      (payload \ "repository"         ).toOption shouldBe None
+      (payload \ "commitIds"          ).toOption shouldBe None
+      (payload \ "requestedBy"        ).toOption shouldBe None
+      (payload \ "assignmentGroup"    ).toOption shouldBe None
 
   "POST sendToServiceNow" should:
     "request an OAuth token and send the event when ServiceNow responds with 201" in:

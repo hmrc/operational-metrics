@@ -107,7 +107,6 @@ class ServiceNowEventStreamRunner @Inject()(
   , branch          : String
   , commitIds       : Seq[CommitId]
   ): String =
-    val startTime = event.time.minusSeconds(10.minutes.toSeconds)
     Seq(
       "Requested by"          -> event.userName.asString
     , "Assignment group"      -> ServiceNowEvent.defaultAssignmentGroup
@@ -118,7 +117,7 @@ class ServiceNowEventStreamRunner @Inject()(
     , "Commit IDs"            -> commitIds.map(_.asString).mkString(", ")
     , "Artefact"              -> event.slugUri
     , "Test results"          -> "Pass"
-    , "Start date time"       -> startTime.toString
+    , "Start date time"       -> workStart(event).toString
     , "End date time"         -> event.time.toString
     , "Deployment status"     -> event.eventType.value
     , "Implementation result" -> event.eventType.value
@@ -141,10 +140,12 @@ class ServiceNowEventStreamRunner @Inject()(
       repository      =  s"https://github.com/hmrc/${event.serviceName.asString}"
       shortDescription = deploymentDescription(event, previous.map(_.version))
       serviceNowEvent =  ServiceNowEvent(
-                           requestedBy          = event.userName
-                         , shortDescription     = shortDescription
+                           shortDescription     = shortDescription
                          , description          = serviceNowDescription(event, shortDescription, repository, branch, commitIds)
                          , cmdbCI               = cmdbCI
+                         , workStart            = workStart(event)
+                         , workEnd              = event.time
+                         , correlationId        = event.deploymentId
                          )
       _               <- serviceNowConnector.sendToServiceNow(serviceNowEvent)
       _               =  logger.info(
@@ -160,4 +161,7 @@ class ServiceNowEventStreamRunner @Inject()(
   private def processingStatusPermanentlyFailedLog(wi: WorkItem[DeploymentEvent]): String =
     s"Failed to send ServiceNow event with ID: ${wi.item.messageId} after ${wi.failureCount} attempts, marking as permanently failed - " +
     s"Deployment Event: ${wi.item.eventType.value} for ${wi.item.serviceName.asString} ${wi.item.version.original} in ${wi.item.environment.asString}"
+
+  private def workStart(event: DeploymentEvent): java.time.Instant =
+    event.time.minusSeconds(10.minutes.toSeconds)
 end ServiceNowEventStreamRunner

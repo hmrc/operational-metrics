@@ -416,10 +416,12 @@ class ServiceNowEventStreamRunnerSpec
     , cmdbCI          : String          = serviceNowMapping.cmdbCI
     ): ServiceNowEvent =
       ServiceNowEvent(
-        requestedBy          = event.userName
-      , shortDescription     = shortDescription
+        shortDescription     = shortDescription
       , description          = onTest.serviceNowDescription(event, shortDescription, repository, branch, commitIds)
       , cmdbCI               = cmdbCI
+      , workStart            = event.time.minusSeconds(600)
+      , workEnd              = event.time
+      , correlationId        = event.deploymentId
       )
 
     val serviceNowEvent: ServiceNowEvent =
