@@ -49,7 +49,7 @@ microservice.services.service-dependencies
    - `deployment-complete`
    - `undeployment-failed`
    - `undeployment-complete`
-5. The deployment-event allow-list is applied.
+5. The deployment-event filter is applied.
 6. Allowed events are persisted to the Mongo work item collection `deploymentEventsQueue`.
 7. The SQS message is deleted after successful parsing and handling.
 8. `ServiceNowEventStreamRunner` pulls outstanding work items from Mongo when `servicenow-stream.enabled` is `true`.
@@ -65,7 +65,7 @@ microservice.services.service-dependencies
 
 ### Event Filtering
 
-`deployment-event-handler.allow-list` controls which parsed SQS events are persisted for ServiceNow processing.
+`deployment-event-handler` controls which parsed SQS events are persisted for ServiceNow processing.
 
 ```hocon
 deployment-event-handler {
@@ -73,25 +73,35 @@ deployment-event-handler {
     environments = ["production"]
     services     = []
   }
+  deny-list {
+    services = []
+  }
 }
 ```
 
-The allow-list is case-insensitive and trims whitespace.
+Configured filter values are case-insensitive and trim whitespace.
 
-An empty list means "allow all" for that dimension. For example:
+An empty environment or service allow-list means "allow all" for that dimension. An empty service deny-list means "deny no services". For example:
 
 ```hocon
-environments = ["production"]
-services     = []
+deployment-event-handler.allow-list.environments = ["production"]
+deployment-event-handler.allow-list.services     = []
+deployment-event-handler.deny-list.services      = []
 ```
 
 allows all services in Production.
 
-For focused testing, set both dimensions:
+Existing focused service allow-lists are still honoured:
 
 ```hocon
 deployment-event-handler.allow-list.environments = ["qa"]
 deployment-event-handler.allow-list.services     = ["internal-auth"]
+```
+
+To suppress MDTP Platform Services, configure `deployment-event-handler.deny-list.services` with their service names:
+
+```hocon
+deployment-event-handler.deny-list.services = ["object-store"]
 ```
 
 In app-config YAML, lists should use indexed keys:
@@ -99,9 +109,10 @@ In app-config YAML, lists should use indexed keys:
 ```yaml
 deployment-event-handler.allow-list.environments.0: qa
 deployment-event-handler.allow-list.services.0: internal-auth
+deployment-event-handler.deny-list.services.0: object-store
 ```
 
-Events that do not match the allow-list are logged and skipped. They are not persisted to `deploymentEventsQueue`.
+Events that do not match the filter are logged and skipped. They are not persisted to `deploymentEventsQueue`.
 
 ### SQS Configuration
 
@@ -263,7 +274,8 @@ Squid must also allow the `operational-metrics` proxy user to reach the configur
 | `aws.sqs.deployment.queueUrl` | SQS queue consumed for deployment events. |
 | `aws.sqs.deployment.endpointOverride` | Optional LocalStack endpoint override. |
 | `deployment-event-handler.allow-list.environments` | Environments accepted from deployment events. Empty means all environments. |
-| `deployment-event-handler.allow-list.services` | Services accepted from deployment events. Empty means all services. |
+| `deployment-event-handler.allow-list.services` | Optional service allow-list for focused filtering. Empty means all services. |
+| `deployment-event-handler.deny-list.services` | Services suppressed from deployment events. Empty means no denied services. |
 | `servicenow-stream.enabled` | Starts the Mongo work item stream that sends events to ServiceNow. |
 | `servicenow-stream.source-tick.initialDelay` | Delay before the ServiceNow stream starts polling. |
 | `servicenow-stream.source-tick.interval` | Poll interval for ServiceNow work item processing. |
