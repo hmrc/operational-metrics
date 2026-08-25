@@ -104,6 +104,8 @@ To suppress MDTP Platform Services, configure `deployment-event-handler.deny-lis
 deployment-event-handler.deny-list.services = ["object-store"]
 ```
 
+The embedded `application.conf` carries the default MDTP Platform Services deny-list. Environment app-config should omit `deployment-event-handler.deny-list.services` unless it needs to replace that default list.
+
 In app-config YAML, lists should use indexed keys:
 
 ```yaml
