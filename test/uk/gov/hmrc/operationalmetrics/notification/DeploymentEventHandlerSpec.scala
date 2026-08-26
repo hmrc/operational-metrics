@@ -26,46 +26,61 @@ import java.time.Instant
 
 class DeploymentEventHandlerSpec extends AnyWordSpec with Matchers:
 
-  "DeploymentEventHandler.AllowList" should:
+  "DeploymentEventHandler.EventFilter" should:
     "default to production events for all services" in:
-      val allowList =
-        DeploymentEventHandler.AllowList.fromConfig(Configuration.from(Map.empty))
+      val eventFilter =
+        DeploymentEventHandler.EventFilter.fromConfig(Configuration.from(Map.empty))
 
-      allowList.allows(deploymentEvent(Environment.Production, ServiceName("service-1"))) shouldBe true
-      allowList.allows(deploymentEvent(Environment.QA        , ServiceName("service-1"))) shouldBe false
-      allowList.allows(deploymentEvent(Environment.Production, ServiceName("service-2"))) shouldBe true
+      eventFilter.allows(deploymentEvent(Environment.Production, ServiceName("service-1"))) shouldBe true
+      eventFilter.allows(deploymentEvent(Environment.QA        , ServiceName("service-1"))) shouldBe false
+      eventFilter.allows(deploymentEvent(Environment.Production, ServiceName("service-2"))) shouldBe true
 
-    "allow only configured environments and services when populated" in:
-      val allowList =
-        DeploymentEventHandler.AllowList.fromConfig(Configuration(
+    "allow only configured environments while rejecting denied services" in:
+      val eventFilter =
+        DeploymentEventHandler.EventFilter.fromConfig(Configuration(
           "deployment-event-handler.allow-list.environments" -> Seq("qa", "staging")
-        , "deployment-event-handler.allow-list.services"     -> Seq("service-1")
+        , "deployment-event-handler.deny-list.services"      -> Seq("service-2", "object-store")
         ))
 
-      allowList.allows(deploymentEvent(Environment.QA        , ServiceName("service-1"))) shouldBe true
-      allowList.allows(deploymentEvent(Environment.Staging   , ServiceName("service-1"))) shouldBe true
-      allowList.allows(deploymentEvent(Environment.Production, ServiceName("service-1"))) shouldBe false
-      allowList.allows(deploymentEvent(Environment.QA        , ServiceName("service-2"))) shouldBe false
+      eventFilter.allows(deploymentEvent(Environment.QA        , ServiceName("service-1")))    shouldBe true
+      eventFilter.allows(deploymentEvent(Environment.Staging   , ServiceName("service-1")))    shouldBe true
+      eventFilter.allows(deploymentEvent(Environment.Production, ServiceName("service-1")))    shouldBe false
+      eventFilter.allows(deploymentEvent(Environment.QA        , ServiceName("service-2")))    shouldBe false
+      eventFilter.allows(deploymentEvent(Environment.QA        , ServiceName("object-store"))) shouldBe false
 
-    "treat an empty allow-list as all values for that dimension" in:
-      val allowList =
-        DeploymentEventHandler.AllowList.fromConfig(Configuration(
+    "honour the service allow-list when it is populated" in:
+      val eventFilter =
+        DeploymentEventHandler.EventFilter.fromConfig(Configuration(
+          "deployment-event-handler.allow-list.environments" -> Seq("qa")
+        , "deployment-event-handler.allow-list.services"     -> Seq("service-1")
+        , "deployment-event-handler.deny-list.services"      -> Seq("object-store")
+        ))
+
+      eventFilter.allows(deploymentEvent(Environment.QA, ServiceName("service-1")))    shouldBe true
+      eventFilter.allows(deploymentEvent(Environment.QA, ServiceName("service-2")))    shouldBe false
+      eventFilter.allows(deploymentEvent(Environment.QA, ServiceName("object-store"))) shouldBe false
+
+    "treat an empty environment allow-list as all environments and an empty service deny-list as no denied services" in:
+      val eventFilter =
+        DeploymentEventHandler.EventFilter.fromConfig(Configuration(
           "deployment-event-handler.allow-list.environments" -> Seq.empty[String]
-        , "deployment-event-handler.allow-list.services"     -> Seq("service-1")
+        , "deployment-event-handler.allow-list.services"     -> Seq.empty[String]
+        , "deployment-event-handler.deny-list.services"      -> Seq.empty[String]
         ))
 
-      allowList.allows(deploymentEvent(Environment.Production, ServiceName("service-1"))) shouldBe true
-      allowList.allows(deploymentEvent(Environment.QA        , ServiceName("service-1"))) shouldBe true
-      allowList.allows(deploymentEvent(Environment.QA        , ServiceName("service-2"))) shouldBe false
+      eventFilter.allows(deploymentEvent(Environment.Production, ServiceName("service-1"))) shouldBe true
+      eventFilter.allows(deploymentEvent(Environment.QA        , ServiceName("service-1"))) shouldBe true
+      eventFilter.allows(deploymentEvent(Environment.QA        , ServiceName("service-2"))) shouldBe true
 
     "normalise configured values before matching" in:
-      val allowList =
-        DeploymentEventHandler.AllowList.fromConfig(Configuration(
+      val eventFilter =
+        DeploymentEventHandler.EventFilter.fromConfig(Configuration(
           "deployment-event-handler.allow-list.environments" -> Seq(" Production ")
-        , "deployment-event-handler.allow-list.services"     -> Seq(" SERVICE-1 ")
+        , "deployment-event-handler.deny-list.services"      -> Seq(" OBJECT-STORE ")
         ))
 
-      allowList.allows(deploymentEvent(Environment.Production, ServiceName("service-1"))) shouldBe true
+      eventFilter.allows(deploymentEvent(Environment.Production, ServiceName("service-1")))    shouldBe true
+      eventFilter.allows(deploymentEvent(Environment.Production, ServiceName("object-store"))) shouldBe false
 
   private def deploymentEvent(
     environment: Environment

@@ -41,8 +41,8 @@ class DeploymentEventHandler @Inject()(
 , config = SqsConfig("aws.sqs.deployment", configuration)
 )(using actorSystem, ec):
 
-  private lazy val allowList: DeploymentEventHandler.AllowList =
-    DeploymentEventHandler.AllowList.fromConfig(configuration)
+  private lazy val eventFilter: DeploymentEventHandler.EventFilter =
+    DeploymentEventHandler.EventFilter.fromConfig(configuration)
 
   private def prefixLog(
     message: Message
@@ -52,13 +52,13 @@ class DeploymentEventHandler @Inject()(
     s"and details: ${payload.serviceName.asString} ${payload.version.original} ${payload.environment.asString}."
 
   private def enqueue(payload: DeploymentEvent, message: Message): Future[Unit] =
-    if allowList.allows(payload) then
+    if eventFilter.allows(payload) then
       repository
         .pushNew(payload)
         .map: _ =>
           logger.info(s"Successfully pushed to work item repo: ${prefixLog(message, payload)}")
     else
-      Future.successful(logger.info(s"Skipping non-allowlisted deployment event: ${prefixLog(message, payload)}"))
+      Future.successful(logger.info(s"Skipping filtered deployment event: ${prefixLog(message, payload)}"))
 
   override private[notification] def processMessage(message: Message): Future[MessageAction] =
     logger.info(s"Starting processing Deployment Event message with ID: ${message.messageId()}")
@@ -89,26 +89,35 @@ class DeploymentEventHandler @Inject()(
       case Right(action) => action
 
 object DeploymentEventHandler:
-  final case class AllowList(
-    environments: Seq[String]
-  , services    : Seq[String]
+  final case class EventFilter(
+    allowedEnvironments: Seq[String]
+  , allowedServices     : Seq[String]
+  , deniedServices     : Seq[String]
   ):
     private def allows(allowList: Seq[String], value: String): Boolean =
-      allowList.isEmpty || allowList.contains(AllowList.normalise(value))
+      allowList.isEmpty || allowList.contains(EventFilter.normalise(value))
+
+    private def denies(denyList: Seq[String], value: String): Boolean =
+      denyList.contains(EventFilter.normalise(value))
 
     def allows(event: DeploymentEvent): Boolean =
-      allows(environments, event.environment.asString) &&
-        allows(services, event.serviceName.asString)
+      allows(allowedEnvironments, event.environment.asString) &&
+        allows(allowedServices, event.serviceName.asString) &&
+        !denies(deniedServices, event.serviceName.asString)
 
-  object AllowList:
-    private val configKey =
+  object EventFilter:
+    private val allowListConfigKey =
       "deployment-event-handler.allow-list"
+
+    private val denyListConfigKey =
+      "deployment-event-handler.deny-list"
 
     private def normalise(value: String): String =
       value.trim.toLowerCase(Locale.ROOT)
 
-    def fromConfig(configuration: Configuration): AllowList =
-      AllowList(
-        environments = configuration.getOptional[Seq[String]](s"$configKey.environments").getOrElse(Seq("production")).map(normalise)
-      , services     = configuration.getOptional[Seq[String]](s"$configKey.services").getOrElse(Seq.empty).map(normalise)
+    def fromConfig(configuration: Configuration): EventFilter =
+      EventFilter(
+        allowedEnvironments = configuration.getOptional[Seq[String]](s"$allowListConfigKey.environments").getOrElse(Seq("production")).map(normalise)
+      , allowedServices     = configuration.getOptional[Seq[String]](s"$allowListConfigKey.services").getOrElse(Seq.empty).map(normalise)
+      , deniedServices      = configuration.getOptional[Seq[String]](s"$denyListConfigKey.services").getOrElse(Seq.empty).map(normalise)
       )
