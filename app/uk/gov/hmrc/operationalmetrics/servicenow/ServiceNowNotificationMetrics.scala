@@ -16,12 +16,12 @@
 
 package uk.gov.hmrc.operationalmetrics.servicenow
 
-import com.codahale.metrics.SharedMetricRegistries
+import com.codahale.metrics.{MetricRegistry, SharedMetricRegistries}
 import ServiceNowNotificationMetrics.{ServiceNowDeployMetricKey, ServiceNowNotification}
 
 trait ServiceNowNotificationMetrics:
   
-  protected val metricRegistry = SharedMetricRegistries.getOrCreate(ServiceNowDeployMetricKey)
+  protected val metricRegistry: MetricRegistry = SharedMetricRegistries.getOrCreate(ServiceNowDeployMetricKey)
 
   def recordSuccess(): Unit =
     incrementMetricCounter(ServiceNowNotification.SuccessfulySent)
