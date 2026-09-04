@@ -25,6 +25,7 @@ import play.api.Configuration
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.{HttpClientV2Support, WireMockSupport}
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowConnector.SendToServiceNowStatus
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
 
 import java.time.{Clock, Duration, Instant, ZoneId, ZoneOffset}
@@ -95,7 +96,7 @@ class ServiceNowConnectorSpec
       stubToken()
       stubChangeRegistration()
 
-      serviceNowConnector().sendToServiceNow(serviceNowEvent).futureValue shouldBe ()
+      serviceNowConnector().sendToServiceNow(serviceNowEvent).futureValue shouldBe SendToServiceNowStatus.Sent
 
       verifyTokenRequested(1)
 
@@ -103,22 +104,25 @@ class ServiceNowConnectorSpec
       stubToken()
       stubChangeRegistration(status = 200)
 
-      serviceNowConnector().sendToServiceNow(serviceNowEvent).failed.futureValue.getMessage should
-        include("Unexpected response from ServiceNow: 200")
+      serviceNowConnector().sendToServiceNow(serviceNowEvent).futureValue shouldBe (
+        SendToServiceNowStatus.Rejected(200, "Unexpected response from ServiceNow: 200")
+      )
 
     "fail when ServiceNow responds with a 5xx error" in:
       stubToken()
       stubChangeRegistration(status = 500, body = "Internal Server Error")
 
-      serviceNowConnector().sendToServiceNow(serviceNowEvent).failed.futureValue.getMessage should
-        include("500")
+      serviceNowConnector().sendToServiceNow(serviceNowEvent).futureValue match
+        case SendToServiceNowStatus.UpstreamError(statusCode, _) => statusCode shouldBe 500
+        case other                                               => fail(s"Expected upstream error status, got $other")
 
     "fail when ServiceNow responds with a 4xx error" in:
       stubToken()
       stubChangeRegistration(status = 400, body = "Bad Request")
 
-      serviceNowConnector().sendToServiceNow(serviceNowEvent).failed.futureValue.getMessage should
-        include("400")
+      serviceNowConnector().sendToServiceNow(serviceNowEvent).futureValue match
+        case SendToServiceNowStatus.UpstreamError(statusCode, _) => statusCode shouldBe 400
+        case other                                               => fail(s"Expected upstream error status, got $other")
 
     "reuse the current OAuth token while it is still valid" in:
       stubToken(accessToken = "cached-token")
@@ -126,8 +130,8 @@ class ServiceNowConnectorSpec
 
       val connector = serviceNowConnector()
 
-      connector.sendToServiceNow(serviceNowEvent).futureValue shouldBe ()
-      connector.sendToServiceNow(serviceNowEvent).futureValue shouldBe ()
+      connector.sendToServiceNow(serviceNowEvent).futureValue shouldBe SendToServiceNowStatus.Sent
+      connector.sendToServiceNow(serviceNowEvent).futureValue shouldBe SendToServiceNowStatus.Sent
 
       verifyTokenRequested(1)
       verify(
@@ -143,13 +147,13 @@ class ServiceNowConnectorSpec
       stubToken(accessToken = "first-token", expiresIn = 120)
       stubChangeRegistration(authorization = "Bearer first-token")
 
-      connector.sendToServiceNow(serviceNowEvent).futureValue shouldBe ()
+      connector.sendToServiceNow(serviceNowEvent).futureValue shouldBe SendToServiceNowStatus.Sent
 
       clock.advance(Duration.ofSeconds(61))
       stubToken(accessToken = "second-token", expiresIn = 120)
       stubChangeRegistration(authorization = "Bearer second-token")
 
-      connector.sendToServiceNow(serviceNowEvent).futureValue shouldBe ()
+      connector.sendToServiceNow(serviceNowEvent).futureValue shouldBe SendToServiceNowStatus.Sent
 
       verifyTokenRequested(2)
 

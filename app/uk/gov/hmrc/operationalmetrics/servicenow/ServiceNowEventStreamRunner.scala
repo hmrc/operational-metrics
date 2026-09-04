@@ -26,6 +26,7 @@ import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentEvent, Version}
 import uk.gov.hmrc.operationalmetrics.persistence.{DeploymentEventsQueueRepository, ServiceNowMappingsRepository}
 import uk.gov.hmrc.operationalmetrics.connector.{ArtefactProcessorConnector, ReleasesConnector}
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowConnector.SendToServiceNowStatus
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
 
 import javax.inject.{Inject, Singleton}
@@ -45,7 +46,8 @@ class ServiceNowEventStreamRunner @Inject()(
 )(implicit
   ec : ExecutionContext
 , mat: Materializer
-) extends Logging:
+) extends ServiceNowNotificationMetrics with Logging:
+
 
   private val initialDelay: FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.initialDelay").toMillis.millis
   private val interval    : FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.interval"    ).toMillis.millis
@@ -147,7 +149,17 @@ class ServiceNowEventStreamRunner @Inject()(
                          , workEnd              = event.time
                          , correlationId        = event.deploymentId
                          )
-      _               <- serviceNowConnector.sendToServiceNow(serviceNowEvent)
+      sNowSendStatus  <- serviceNowConnector.sendToServiceNow(serviceNowEvent)
+      _               <- sNowSendStatus match
+                           case SendToServiceNowStatus.Sent =>
+                             recordSuccess()
+                             Future.unit
+                           case SendToServiceNowStatus.Rejected(_, message) =>
+                             recordRejected()
+                             Future.failed(RuntimeException(message))
+                           case SendToServiceNowStatus.UpstreamError(_, message) =>
+                             recordFail()
+                             Future.failed(RuntimeException(message))
       _               =  logger.info(
                            s"Successfully sent event to ServiceNow with ID: ${event.messageId} event type: ${event.eventType.value} "
                          + s"and details: ${event.serviceName.asString} ${event.version.original} in ${event.environment.asString}"
