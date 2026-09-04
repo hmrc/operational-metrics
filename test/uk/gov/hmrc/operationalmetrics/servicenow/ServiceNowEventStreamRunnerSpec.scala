@@ -37,6 +37,7 @@ import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
 import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentConfigFile, DeploymentEvent, Environment, FileName, RepoName, ServiceName, UserName, Version}
 import uk.gov.hmrc.operationalmetrics.persistence.{DeploymentEventsQueueRepository, ServiceNowMappingsRepository}
 import uk.gov.hmrc.operationalmetrics.persistence.ServiceNowMappingsRepository.ServiceNowMapping
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowConnector.SendToServiceNowStatus
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -69,7 +70,7 @@ class ServiceNowEventStreamRunnerSpec
       when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
         .thenReturn(Future.successful(Some(metaArtefact)))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
 
       onTest.run(Source.repeat(()).take(2)).futureValue shouldBe Done
 
@@ -92,7 +93,7 @@ class ServiceNowEventStreamRunnerSpec
       when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
         .thenReturn(Future.successful(Some(metaArtefact)))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
 
       onTest.run(Source.single(())).futureValue shouldBe Done
 
@@ -109,7 +110,7 @@ class ServiceNowEventStreamRunnerSpec
       when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
         .thenReturn(Future.successful(None))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
       when(mockRepo.markAs(any[ObjectId], eqTo(ProcessingStatus.Succeeded), any[Option[java.time.Instant]]()))
         .thenReturn(Future.successful(()))
       when(mockRepo.completeAndDelete(any[ObjectId]))
@@ -140,7 +141,7 @@ class ServiceNowEventStreamRunnerSpec
       when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
         .thenReturn(Future.successful(Some(metaArtefact)))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.failed(RuntimeException("Service now request failed")))
+        .thenReturn(Future.successful(SendToServiceNowStatus.UpstreamError(500, "Service now request failed")))
       when(mockRepo.markAs(any[ObjectId], eqTo(ProcessingStatus.Failed), any[Option[java.time.Instant]]()))
         .thenReturn(Future.successful(()))
 
@@ -158,7 +159,7 @@ class ServiceNowEventStreamRunnerSpec
       when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
         .thenReturn(Future.successful(Some(metaArtefact)))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.failed(RuntimeException("Service now request failed")))
+        .thenReturn(Future.successful(SendToServiceNowStatus.UpstreamError(500, "Service now request failed")))
       when(mockRepo.markAs(any[ObjectId], eqTo(ProcessingStatus.PermanentlyFailed), any[Option[java.time.Instant]]()))
         .thenReturn(Future.successful(()))
 
@@ -181,7 +182,7 @@ class ServiceNowEventStreamRunnerSpec
       when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
         .thenReturn(Future.successful(Some(metaArtefact)))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
 
       onTest.run(Source.repeat(()).take(2)).futureValue shouldBe Done
 
@@ -202,7 +203,7 @@ class ServiceNowEventStreamRunnerSpec
       when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
         .thenReturn(Future.successful(Some(metaArtefact)))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
 
       onTest.run(Source.single(())).futureValue shouldBe Done
 
@@ -245,7 +246,7 @@ class ServiceNowEventStreamRunnerSpec
        when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
          .thenReturn(Future.successful(Some(metaArtefact)))
        when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-         .thenReturn(Future.successful(()))
+         .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
 
        onTest.process(workItem.item).futureValue
 
@@ -257,7 +258,7 @@ class ServiceNowEventStreamRunnerSpec
       when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
         .thenReturn(Future.successful(None))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
 
       onTest.process(workItem.item.copy(version = Version(1, 0, 1, "1.0.1"))).futureValue
 
@@ -274,7 +275,7 @@ class ServiceNowEventStreamRunnerSpec
       when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
         .thenReturn(Future.successful(None))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
 
       onTest.process(workItem.item).futureValue
 
@@ -291,13 +292,13 @@ class ServiceNowEventStreamRunnerSpec
       when(mockServiceNowMappingsRepository.find(any[String]))
         .thenReturn(Future.successful(None))
       when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
-        .thenReturn(Future.successful(()))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
 
       onTest.process(workItem.item).futureValue
 
-      verify(mockSNConnector, times(1)).sendToServiceNow(eqTo(
-        serviceNowEvent.copy(cmdbCI = defaultCmdbCI)
-      ))
+       verify(mockSNConnector, times(1)).sendToServiceNow(eqTo(
+         serviceNowEvent.copy(cmdbCI = defaultCmdbCI)
+       ))
 
     "build a single string description containing the former payload fields" in new Setup:
       val description =
@@ -317,6 +318,55 @@ class ServiceNowEventStreamRunnerSpec
       description should include(s"End date time: ${workItem.item.time}")
       description should include("Deployment status: deployment-complete")
 
+  "Service Now Notification Metrics" should:
+    "record success metric when deployment is sent successfully" in new Setup:
+      when(mockRConnector.previousDeployment(any[ServiceName], any[Environment], any[java.time.Instant])(using any))
+        .thenReturn(Future.successful(Some(historicDeployment)))
+      when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
+        .thenReturn(Future.successful(Some(metaArtefact)))
+      when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Sent))
+
+      onTest.process(workItem.item).futureValue
+
+      successCallCount shouldBe 1
+      failCallCount shouldBe 0
+      rejectedCallCount shouldBe 0
+
+    "record fail metric when upstream error occurs" in new Setup:
+      when(mockRConnector.previousDeployment(any[ServiceName], any[Environment], any[java.time.Instant])(using any))
+        .thenReturn(Future.successful(Some(historicDeployment)))
+      when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
+        .thenReturn(Future.successful(Some(metaArtefact)))
+      when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
+        .thenReturn(Future.successful(SendToServiceNowStatus.UpstreamError(500, "Service now error")))
+
+      try
+        onTest.process(workItem.item).futureValue
+      catch
+        case _: Throwable => () // expected to fail
+
+      failCallCount shouldBe 1
+      successCallCount shouldBe 0
+      rejectedCallCount shouldBe 0
+
+    "record rejected metric when event is rejected" in new Setup:
+      when(mockRConnector.previousDeployment(any[ServiceName], any[Environment], any[java.time.Instant])(using any))
+        .thenReturn(Future.successful(Some(historicDeployment)))
+      when(mockAPConnector.getMetaArtefact(any[String], any[Version])(using any))
+        .thenReturn(Future.successful(Some(metaArtefact)))
+      when(mockSNConnector.sendToServiceNow(any[ServiceNowEvent]))
+        .thenReturn(Future.successful(SendToServiceNowStatus.Rejected(400, "Event rejected")))
+
+      try
+        onTest.process(workItem.item).futureValue
+      catch
+        case _: Throwable => () // expected to fail
+
+      rejectedCallCount shouldBe 1
+      successCallCount shouldBe 0
+      failCallCount shouldBe 0
+
   trait Setup:
     given HeaderCarrier = HeaderCarrier()
 
@@ -334,21 +384,36 @@ class ServiceNowEventStreamRunnerSpec
     val mockSNConnector                  : ServiceNowConnector             = mock[ServiceNowConnector]
     val mockAPConnector                  : ArtefactProcessorConnector      = mock[ArtefactProcessorConnector]
     val mockRConnector                   : ReleasesConnector               = mock[ReleasesConnector]
+
     val serviceNowMapping                : ServiceNowMapping               = ServiceNowMapping("service-1", "service-now-mapping-1")
     val defaultCmdbCI                    : String                          = "default-service-now-mapping"
 
     when(mockServiceNowMappingsRepository.find(any[String]))
       .thenReturn(Future.successful(Some(serviceNowMapping)))
 
+    // Track metric recording calls
+    var successCallCount = 0
+    var failCallCount = 0
+    var rejectedCallCount = 0
+
     val onTest: ServiceNowEventStreamRunner =
-      ServiceNowEventStreamRunner(
+      new ServiceNowEventStreamRunner(
         mockRepo
       , mockServiceNowMappingsRepository
       , mockConfig
       , mockRConnector
       , mockAPConnector
       , mockSNConnector
-      )
+      ) with ServiceNowNotificationMetrics {
+        override def recordSuccess(): Unit =
+          successCallCount += 1
+
+        override def recordFail(): Unit =
+          failCallCount += 1
+
+        override def recordRejected(): Unit =
+          rejectedCallCount += 1
+      }
 
     val deploymentConfigFile1 =
       DeploymentConfigFile(

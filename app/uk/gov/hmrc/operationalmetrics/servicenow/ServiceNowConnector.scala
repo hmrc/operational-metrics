@@ -39,6 +39,7 @@ class ServiceNowConnector @Inject() (
   ec: ExecutionContext
 ):
   import HttpReads.Implicits.*
+  import ServiceNowConnector.{SendToServiceNowStatus => SNowStatus}
 
   private val baseUrl           = config.get[String]("servicenow.url").stripSuffix("/")
   private val clientId          = config.get[String]("servicenow.oauth.client-id")
@@ -49,7 +50,7 @@ class ServiceNowConnector @Inject() (
 
   given HeaderCarrier = HeaderCarrier()
 
-  def sendToServiceNow(body: ServiceNowEvent): Future[Unit] =
+  def sendToServiceNow(body: ServiceNowEvent): Future[SNowStatus] =
     given Writes[ServiceNowEvent] = ServiceNowEvent.writes
     accessToken().flatMap: token =>
       httpClientV2
@@ -59,10 +60,10 @@ class ServiceNowConnector @Inject() (
         .withBody(Json.toJson(body))
         .withProxy
         .execute[Either[UpstreamErrorResponse, HttpResponse]]
-          .flatMap:
-            case Right(r) if r.status == Status.CREATED => Future.unit
-            case Right(r)                               => Future.failed(RuntimeException(s"Unexpected response from ServiceNow: ${r.status}"))
-            case Left(e)                                => Future.failed(RuntimeException(s"ServiceNow upstream error: ${e.statusCode} ${e.message}"))
+          .map:
+            case Right(r) if r.status == Status.CREATED => SNowStatus.Sent
+            case Right(r)                               => SNowStatus.Rejected(r.status, s"Unexpected response from ServiceNow: ${r.status}")
+            case Left(e)                                => SNowStatus.UpstreamError(e.statusCode, s"ServiceNow upstream error: ${e.statusCode} ${e.message}")
 
   private def accessToken(): Future[CachedAccessToken] =
     this.synchronized:
@@ -127,3 +128,10 @@ private final case class ServiceNowAccessToken(
 private object ServiceNowAccessToken:
   given Reads[ServiceNowAccessToken] =
     Json.reads[ServiceNowAccessToken]
+
+object ServiceNowConnector:
+  enum SendToServiceNowStatus:
+    case Sent
+    case Rejected(statusCode: Int, message: String)
+    case UpstreamError(statusCode: Int, message: String)
+
