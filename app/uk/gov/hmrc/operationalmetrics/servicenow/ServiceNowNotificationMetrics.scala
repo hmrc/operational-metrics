@@ -36,7 +36,7 @@ trait ServiceNowNotificationMetrics:
     metricRegistry.counter(notification.metricId).inc()
 
 object ServiceNowNotificationMetrics:
-  val ServiceNowDeployMetricKey: String = "ServiceNow-Send-Notification-Metrics"
+  val ServiceNowDeployMetricKey: String = "servicenow-send-notification-metrics"
 
   enum ServiceNowNotification(val metricId: String):
     case SuccessfulySent extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.successful")
