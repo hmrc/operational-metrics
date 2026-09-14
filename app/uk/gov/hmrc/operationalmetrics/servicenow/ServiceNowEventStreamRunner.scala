@@ -34,12 +34,14 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
 import scala.util.Failure
 import cats.implicits.*
+import com.codahale.metrics.MetricRegistry
+import uk.gov.hmrc.operationalmetrics.config.AppConfig
 
 @Singleton
 class ServiceNowEventStreamRunner @Inject()(
   repo                      : DeploymentEventsQueueRepository
 , serviceNowMapping         : ServiceNowMappingsRepository
-, config                    : Configuration
+, val appConfig             : AppConfig
 , releasesConnector         : ReleasesConnector
 , artefactProcessorConnector: ArtefactProcessorConnector
 , serviceNowConnector       : ServiceNowConnector
@@ -48,15 +50,16 @@ class ServiceNowEventStreamRunner @Inject()(
 , mat: Materializer
 ) extends ServiceNowNotificationMetrics with Logging:
 
-
-  private val initialDelay: FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.initialDelay").toMillis.millis
-  private val interval    : FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.interval"    ).toMillis.millis
-  private val defaultCmdbCI: String         = config.get[String]("servicenow.default-cmdb-ci")
-
+  val          SNowConfig   : appConfig.ServiceNowConfig = appConfig.serviceNowConfig
+  override val metricConfig : appConfig.MetricsConfig    =  appConfig.metricsConfig
+    
   private given             HeaderCarrier  = HeaderCarrier()
+  
 
-  if   config.get[Boolean]("servicenow-stream.enabled") then
-       run(Source.tick(initialDelay = initialDelay, interval = interval, tick = ()))
+  if   SNowConfig.serviceNowStreamEnabled then
+       run(Source.tick(initialDelay = SNowConfig.streamSourceTickInitialDelay, 
+                       interval = SNowConfig.streamSourceTickInterval, 
+                       tick = ()))
        logger.info("Started ServiceNow stream")
   else logger.warn("ServiceNow stream is disabled")
 
@@ -138,7 +141,7 @@ class ServiceNowEventStreamRunner @Inject()(
                              case Some(_) => Future.unit
       branch          =  metaArtefact.flatMap(_.gitBranch).getOrElse(if event.version.isHotfix then "hotfix" else "main")
       commitIds       =  metaArtefact.flatMap(_.gitCommit).toSeq ++ event.config.map(_.commitId)
-      cmdbCI          <- serviceNowMapping.find(event.serviceName.asString).map(_.fold(defaultCmdbCI)(_.cmdbCI))
+      cmdbCI          <- serviceNowMapping.find(event.serviceName.asString).map(_.fold(SNowConfig.defaultCmdbCI)(_.cmdbCI))
       repository      =  s"https://github.com/hmrc/${event.serviceName.asString}"
       shortDescription = deploymentDescription(event, previous.map(_.version))
       serviceNowEvent =  ServiceNowEvent(
@@ -167,7 +170,7 @@ class ServiceNowEventStreamRunner @Inject()(
     yield ()
 
   private def processingStatusFailedLog(wi: WorkItem[DeploymentEvent]): String =
-    s"Failed to send ServiceNow event with ID: ${wi.item.messageId}, will retry in ${config.getMillis("queue.retryInterval") / 1000}s - " +
+    s"Failed to send ServiceNow event with ID: ${wi.item.messageId}, will retry in ${appConfig.config.getMillis("queue.retryInterval") / 1000}s - " +
     s"Deployment Event: ${wi.item.eventType.value} for ${wi.item.serviceName.asString} ${wi.item.version.original} in ${wi.item.environment.asString}, attempt: ${wi.failureCount}"
   
   private def processingStatusPermanentlyFailedLog(wi: WorkItem[DeploymentEvent]): String =

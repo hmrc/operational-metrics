@@ -30,6 +30,7 @@ import org.scalatestplus.mockito.MockitoSugar
 import play.api.Configuration
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.mongo.workitem.{ProcessingStatus, WorkItem}
+import uk.gov.hmrc.operationalmetrics.config.AppConfig
 import uk.gov.hmrc.operationalmetrics.connector.ArtefactProcessorConnector.MetaArtefact
 import uk.gov.hmrc.operationalmetrics.connector.ReleasesConnector.HistoricDeployment
 import uk.gov.hmrc.operationalmetrics.connector.{ArtefactProcessorConnector, ReleasesConnector}
@@ -370,14 +371,16 @@ class ServiceNowEventStreamRunnerSpec
   trait Setup:
     given HeaderCarrier = HeaderCarrier()
 
-    val mockConfig: Configuration =
-      Configuration(
-        "servicenow-stream.enabled"                  -> "false"
+    val playConfig = Configuration(
+        "appName" -> "operational-metrics"
+      , "servicenow-stream.enabled" -> "false"
       , "servicenow-stream.source-tick.initialDelay" -> "1.second"
-      , "servicenow-stream.source-tick.interval"     -> "1.second"
-      , "servicenow.default-cmdb-ci"                  -> "default-service-now-mapping"
-      , "queue.retryInterval"                        -> "1.second"
+      , "servicenow-stream.source-tick.interval" -> "1.second"
+      , "servicenow.default-cmdb-ci" -> "default-service-now-mapping"
+      , "queue.retryInterval" -> "1.second"
       )
+
+    val mockConfig: AppConfig = new AppConfig(playConfig)
 
     val mockRepo                         : DeploymentEventsQueueRepository = mock[DeploymentEventsQueueRepository]
     val mockServiceNowMappingsRepository : ServiceNowMappingsRepository    = mock[ServiceNowMappingsRepository]

@@ -16,10 +16,48 @@
 
 package uk.gov.hmrc.operationalmetrics.config
 
+import com.codahale.metrics.{Counter, Metric, MetricRegistry, NoopMetricRegistry, SharedMetricRegistries}
+
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowNotificationMetrics.{ServiceNowDeployMetricKey, ServiceNowNotification}
+
+import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
 
 @Singleton
-class AppConfig @Inject()(config: Configuration):
+class AppConfig @Inject()(val config: Configuration):
 
   val appName: String = config.get[String]("appName")
+  val serviceNowConfig: ServiceNowConfig = ServiceNowConfig()
+
+  case class ServiceNowConfig(
+    serviceNowStreamEnabled: Boolean             = config.get[Boolean]("servicenow-stream.enabled"),
+
+    streamSourceTickInitialDelay: FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.initialDelay").toMillis.millis,
+    streamSourceTickInterval: FiniteDuration     = config.get[Duration]("servicenow-stream.source-tick.interval"    ).toMillis.millis,
+    defaultCmdbCI: String                        = config.get[String]("servicenow.default-cmdb-ci")
+  )
+
+  val metricsConfig: MetricsConfig = MetricsConfig()
+
+  case class MetricsConfig(
+    graphiteEnabled: Boolean = config.getOptional[Boolean]("microservice.metrics.graphite.enabled").getOrElse(false)
+  ) {
+    val registry = setupMetricRegistry
+
+    val serviceNowNotificationMetrics: Map[ServiceNowNotification, Metric] = {
+      Map(
+        ServiceNowNotification.SuccessfulySent -> registry.counter(ServiceNowDeployMetricKey + ".successful"),
+        ServiceNowNotification.Failed -> registry.counter(ServiceNowDeployMetricKey + ".failed"),
+        ServiceNowNotification.EventRejected -> registry.counter(ServiceNowDeployMetricKey + ".rejected")
+        )
+    }
+
+    private def setupMetricRegistry = {
+      if (graphiteEnabled) then {
+        SharedMetricRegistries.getOrCreate(appName)
+      }
+      else
+        new NoopMetricRegistry
+    }
+  }
