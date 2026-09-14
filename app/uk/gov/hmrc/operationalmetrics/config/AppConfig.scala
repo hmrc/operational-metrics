@@ -16,10 +16,48 @@
 
 package uk.gov.hmrc.operationalmetrics.config
 
+import com.codahale.metrics.{Counter, Metric, MetricRegistry, NoopMetricRegistry, SharedMetricRegistries}
+
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowNotificationMetrics
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowNotificationMetrics.{ServiceNowDeployMetricKey, ServiceNowNotification}
+
+import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
 
 @Singleton
-class AppConfig @Inject()(config: Configuration):
+class AppConfig @Inject()(val config: Configuration):
 
   val appName: String = config.get[String]("appName")
+  val serviceNowConfig: ServiceNowConfig = ServiceNowConfig()
+
+  case class ServiceNowConfig(
+    serviceNowStreamEnabled: Boolean             = config.get[Boolean]("servicenow-stream.enabled"),
+
+    streamSourceTickInitialDelay: FiniteDuration = config.get[Duration]("servicenow-stream.source-tick.initialDelay").toMillis.millis,
+    streamSourceTickInterval: FiniteDuration     = config.get[Duration]("servicenow-stream.source-tick.interval"    ).toMillis.millis,
+    defaultCmdbCI: String                        = config.get[String]("servicenow.default-cmdb-ci")
+  )
+
+  val metricsConfig: MetricsConfig = MetricsConfig(
+    appName = appName,
+    graphiteEnabled = config.getOptional[Boolean]("microservice.metrics.graphite.enabled").getOrElse(false)
+  )
+
+
+case class MetricsConfig(
+  appName: String,
+  graphiteEnabled: Boolean
+):
+  val registry: MetricRegistry = setupMetricRegistry
+
+  val serviceNowNotificationMetrics: Map[ServiceNowNotification, Metric] =
+    ServiceNowNotificationMetrics.ServiceNowNotification.values.map(
+      notification => notification -> registry.counter(notification.metricId)
+    ).toMap
+
+  private def setupMetricRegistry =
+    if graphiteEnabled then
+      SharedMetricRegistries.getOrCreate(appName)
+    else
+      new NoopMetricRegistry

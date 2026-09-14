@@ -16,15 +16,15 @@
 
 package uk.gov.hmrc.operationalmetrics.servicenow
 
-import com.codahale.metrics.{MetricRegistry, SharedMetricRegistries}
-import ServiceNowNotificationMetrics.{ServiceNowDeployMetricKey, ServiceNowNotification}
+import uk.gov.hmrc.operationalmetrics.config.MetricsConfig
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowNotificationMetrics.ServiceNowNotification
 
 trait ServiceNowNotificationMetrics:
-  
-  protected val metricRegistry: MetricRegistry = SharedMetricRegistries.getOrCreate(ServiceNowDeployMetricKey)
+
+  val metricConfig: MetricsConfig
 
   def recordSuccess(): Unit =
-    incrementMetricCounter(ServiceNowNotification.SuccessfulySent)
+    incrementMetricCounter(ServiceNowNotification.SuccessfullySent)
   
   def recordFail(): Unit =
     incrementMetricCounter(ServiceNowNotification.Failed)
@@ -33,12 +33,16 @@ trait ServiceNowNotificationMetrics:
     incrementMetricCounter(ServiceNowNotification.EventRejected)
 
   private def incrementMetricCounter(notification: ServiceNowNotification): Unit =
-    metricRegistry.counter(notification.metricId).inc()
+    metricConfig.serviceNowNotificationMetrics.get(notification).foreach {
+      case counter: com.codahale.metrics.Counter =>
+        counter.inc()
+      case _ => ()
+    }
 
 object ServiceNowNotificationMetrics:
   val ServiceNowDeployMetricKey: String = "servicenow-send-notification-metrics"
 
   enum ServiceNowNotification(val metricId: String):
-    case SuccessfulySent extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.successful")
+    case SuccessfullySent extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.successful")
     case Failed extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.failed")
     case EventRejected extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.rejected")
