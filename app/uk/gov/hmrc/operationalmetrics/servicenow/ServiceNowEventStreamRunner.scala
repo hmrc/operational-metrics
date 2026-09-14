@@ -49,15 +49,15 @@ class ServiceNowEventStreamRunner @Inject()(
 , mat: Materializer
 ) extends ServiceNowNotificationMetrics with Logging:
 
-  val          SNowConfig   : appConfig.ServiceNowConfig = appConfig.serviceNowConfig
+  val          sNowConfig   : appConfig.ServiceNowConfig = appConfig.serviceNowConfig
   override val metricConfig : MetricsConfig              =  appConfig.metricsConfig
     
   private given             HeaderCarrier  = HeaderCarrier()
   
 
-  if   SNowConfig.serviceNowStreamEnabled then
-       run(Source.tick(initialDelay = SNowConfig.streamSourceTickInitialDelay, 
-                       interval = SNowConfig.streamSourceTickInterval, 
+  if   sNowConfig.serviceNowStreamEnabled then
+       run(Source.tick(initialDelay = sNowConfig.streamSourceTickInitialDelay,
+                       interval = sNowConfig.streamSourceTickInterval,
                        tick = ()))
        logger.info("Started ServiceNow stream")
   else logger.warn("ServiceNow stream is disabled")
@@ -140,7 +140,7 @@ class ServiceNowEventStreamRunner @Inject()(
                              case Some(_) => Future.unit
       branch          =  metaArtefact.flatMap(_.gitBranch).getOrElse(if event.version.isHotfix then "hotfix" else "main")
       commitIds       =  metaArtefact.flatMap(_.gitCommit).toSeq ++ event.config.map(_.commitId)
-      cmdbCI          <- serviceNowMapping.find(event.serviceName.asString).map(_.fold(SNowConfig.defaultCmdbCI)(_.cmdbCI))
+      cmdbCI          <- serviceNowMapping.find(event.serviceName.asString).map(_.fold(sNowConfig.defaultCmdbCI)(_.cmdbCI))
       repository      =  s"https://github.com/hmrc/${event.serviceName.asString}"
       shortDescription = deploymentDescription(event, previous.map(_.version))
       serviceNowEvent =  ServiceNowEvent(
