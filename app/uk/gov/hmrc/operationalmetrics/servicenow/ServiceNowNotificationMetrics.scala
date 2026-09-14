@@ -16,18 +16,15 @@
 
 package uk.gov.hmrc.operationalmetrics.servicenow
 
-import uk.gov.hmrc.operationalmetrics.config.AppConfig
-import com.codahale.metrics.{MetricRegistry, SharedMetricRegistries}
-import ServiceNowNotificationMetrics.{ServiceNowDeployMetricKey, ServiceNowNotification}
-
-import javax.inject.Inject
+import uk.gov.hmrc.operationalmetrics.config.MetricsConfig
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowNotificationMetrics.ServiceNowNotification
 
 trait ServiceNowNotificationMetrics:
 
-  val metricConfig: AppConfig#MetricsConfig
+  val metricConfig: MetricsConfig
 
   def recordSuccess(): Unit =
-    incrementMetricCounter(ServiceNowNotification.SuccessfulySent)
+    incrementMetricCounter(ServiceNowNotification.SuccessfullySent)
   
   def recordFail(): Unit =
     incrementMetricCounter(ServiceNowNotification.Failed)
@@ -46,6 +43,6 @@ object ServiceNowNotificationMetrics:
   val ServiceNowDeployMetricKey: String = "servicenow-send-notification-metrics"
 
   enum ServiceNowNotification(val metricId: String):
-    case SuccessfulySent extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.successful")
+    case SuccessfullySent extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.successful")
     case Failed extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.failed")
     case EventRejected extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.rejected")

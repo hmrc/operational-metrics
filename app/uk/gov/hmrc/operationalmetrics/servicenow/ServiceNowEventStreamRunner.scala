@@ -16,26 +16,25 @@
 
 package uk.gov.hmrc.operationalmetrics.servicenow
 
+import cats.implicits.*
 import org.apache.pekko.Done
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
-import play.api.{Configuration, Logging}
+import play.api.Logging
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.mongo.workitem.{ProcessingStatus, WorkItem}
-import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentEvent, Version}
-import uk.gov.hmrc.operationalmetrics.persistence.{DeploymentEventsQueueRepository, ServiceNowMappingsRepository}
+import uk.gov.hmrc.operationalmetrics.config.{AppConfig, MetricsConfig}
 import uk.gov.hmrc.operationalmetrics.connector.{ArtefactProcessorConnector, ReleasesConnector}
 import uk.gov.hmrc.operationalmetrics.model.ecs.ECSEventType
+import uk.gov.hmrc.operationalmetrics.model.{CommitId, DeploymentEvent, Version}
+import uk.gov.hmrc.operationalmetrics.persistence.{DeploymentEventsQueueRepository, ServiceNowMappingsRepository}
 import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowConnector.SendToServiceNowStatus
 import uk.gov.hmrc.operationalmetrics.servicenow.model.ServiceNowEvent
 
 import javax.inject.{Inject, Singleton}
+import scala.concurrent.duration.DurationLong
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
 import scala.util.Failure
-import cats.implicits.*
-import com.codahale.metrics.MetricRegistry
-import uk.gov.hmrc.operationalmetrics.config.AppConfig
 
 @Singleton
 class ServiceNowEventStreamRunner @Inject()(
@@ -51,7 +50,7 @@ class ServiceNowEventStreamRunner @Inject()(
 ) extends ServiceNowNotificationMetrics with Logging:
 
   val          SNowConfig   : appConfig.ServiceNowConfig = appConfig.serviceNowConfig
-  override val metricConfig : appConfig.MetricsConfig    =  appConfig.metricsConfig
+  override val metricConfig : MetricsConfig              =  appConfig.metricsConfig
     
   private given             HeaderCarrier  = HeaderCarrier()
   

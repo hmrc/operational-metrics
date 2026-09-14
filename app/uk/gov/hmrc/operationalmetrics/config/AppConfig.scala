@@ -20,6 +20,7 @@ import com.codahale.metrics.{Counter, Metric, MetricRegistry, NoopMetricRegistry
 
 import javax.inject.{Inject, Singleton}
 import play.api.Configuration
+import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowNotificationMetrics
 import uk.gov.hmrc.operationalmetrics.servicenow.ServiceNowNotificationMetrics.{ServiceNowDeployMetricKey, ServiceNowNotification}
 
 import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
@@ -38,26 +39,25 @@ class AppConfig @Inject()(val config: Configuration):
     defaultCmdbCI: String                        = config.get[String]("servicenow.default-cmdb-ci")
   )
 
-  val metricsConfig: MetricsConfig = MetricsConfig()
+  val metricsConfig: MetricsConfig = MetricsConfig(
+    appName = appName,
+    graphiteEnabled = config.getOptional[Boolean]("microservice.metrics.graphite.enabled").getOrElse(false)
+  )
 
-  case class MetricsConfig(
-    graphiteEnabled: Boolean = config.getOptional[Boolean]("microservice.metrics.graphite.enabled").getOrElse(false)
-  ) {
-    val registry = setupMetricRegistry
 
-    val serviceNowNotificationMetrics: Map[ServiceNowNotification, Metric] = {
-      Map(
-        ServiceNowNotification.SuccessfulySent -> registry.counter(ServiceNowDeployMetricKey + ".successful"),
-        ServiceNowNotification.Failed -> registry.counter(ServiceNowDeployMetricKey + ".failed"),
-        ServiceNowNotification.EventRejected -> registry.counter(ServiceNowDeployMetricKey + ".rejected")
-        )
-    }
+case class MetricsConfig(
+  appName: String,
+  graphiteEnabled: Boolean
+):
+  val registry: MetricRegistry = setupMetricRegistry
 
-    private def setupMetricRegistry = {
-      if (graphiteEnabled) then {
-        SharedMetricRegistries.getOrCreate(appName)
-      }
-      else
-        new NoopMetricRegistry
-    }
-  }
+  val serviceNowNotificationMetrics: Map[ServiceNowNotification, Metric] =
+    ServiceNowNotificationMetrics.ServiceNowNotification.values.map(
+      notification => notification -> registry.counter(notification.metricId)
+    ).toMap
+
+  private def setupMetricRegistry =
+    if graphiteEnabled then
+      SharedMetricRegistries.getOrCreate(appName)
+    else
+      new NoopMetricRegistry
