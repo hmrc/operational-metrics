@@ -43,6 +43,6 @@ object ServiceNowNotificationMetrics:
   val ServiceNowDeployMetricKey: String = "servicenow-send-notification-metrics"
 
   enum ServiceNowNotification(val metricId: String):
-    case SuccessfullySent extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.successful")
+    case SuccessfullySent extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.success")
     case Failed extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.failed")
     case EventRejected extends ServiceNowNotification(s"$ServiceNowDeployMetricKey.rejected")
